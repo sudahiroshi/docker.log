@@ -982,7 +982,7 @@ suda@debian:~$
 
 |単語|意味|
 |-|-|
-|-d|停止時に残骸を自動的に削除|
+|--rm|停止時に残骸を自動的に削除|
 |-v /home/suda/html:/usr/hsare/nginx/html|コロンよりも前のディレクトリをコンテナ内のコロン以後のディレクトリにディレクトリにマウント|
 
 この状態でWebブラウザから```http://localhost:10080```にアクセスすると，Webページの内容が変わっているはずである．
@@ -1011,3 +1011,55 @@ root@ddfec24dff54:/#
 ```
 
 後は，いつものように設定ファイルを確認したり，Webページのデータがきちんとマウントされているか確認すれば良い確認すれば良い．
+例によって，終了はexitである．
+
+# Gitサーバを立ち上げてみる
+
+Webサーバだけでは，サービスを起動した感じがしないので，別のサービスを起動する．
+ここでは，Gitサーバ```gogs```を起動してみる．
+
+nginxを動かしたままで良いので，以下のようにして起動しよう．
+
+
+```
+suda@debian:~$ mkdir -p gogs
+suda@debian:~$ sudo docker run -name gogs -d --rm -p 3000:3000 -v /home/suda/gogs:/data gogs/gogs
+Unable to find image 'gogs/gogs:latest' locally
+latest: Pulling from gogs/gogs
+b1f00a6a160c: Pull complete
+219d6f70b7c7: Pull complete
+d7347dd7b842: Pull complete
+91781f374319: Pull complete
+2af6e1a042d8: Pull complete
+c8aa11c846cd: Pull complete
+63ac2f7bab89: Pull complete
+75e74f5ba116: Pull complete
+8c5f51d39741: Pull complete
+5e9f52d4c77e: Pull complete
+4f319b1c39f5: Pull complete
+Digest: sha256:f770a8d3f5f38bd7905ec030f3e66da800c21ce6f9c91c5c48199e6ac31f3010
+Status: Downloaded newer image for gogs/gogs:latest
+usermod: no changes
+Dec 12 10:44:40 syslogd started: BusyBox v1.25.1
+2017/12/12 10:44:52 [ WARN] Custom config '/data/gogs/conf/app.ini' not found, ignore this if you're running first time
+2017/12/12 10:44:52 [TRACE] Custom path: /data/gogs
+2017/12/12 10:44:52 [TRACE] Log path: /app/gogs/log
+2017/12/12 10:44:52 [TRACE] Build Time: 2017-11-22 08:19:49 UTC
+2017/12/12 10:44:52 [TRACE] Build Git Hash:
+2017/12/12 10:44:52 [TRACE] Log Mode: Console (Trace)
+2017/12/12 10:44:52 [ INFO] Gogs 0.11.34.1122
+2017/12/12 10:44:52 [ INFO] Cache Service Enabled
+2017/12/12 10:44:52 [ INFO] Session Service Enabled
+2017/12/12 10:44:52 [ INFO] SQLite3 Supported
+2017/12/12 10:44:52 [ INFO] Run Mode: Development
+2017/12/12 10:44:52 [ INFO] Listen: http://0.0.0.0:3000
+03cae309093279170ddcd095889ea06b75a4aa6eb4358330608083826e712b3f
+```
+
+この状態で```http://localhost:3000/```にアクセスすると，gogsの初期設定画面が現れる．
+一番上の```データベースの種類```を```SQLite3```に変更し，```SSHポート```を空白に変更して，最下部の```Gogsをインストール```をクリックしよう．
+すると，ログイン画面が出てくるので，サインインボタンの下にある```アカウントが必要ですか？今すぐ登録しましょう！```をクリックしてユーザ登録を行なう．
+
+
+必要事項を入力して```新規アカウントを作成```をクリックすると，再度ログイン画面になる．
+先程入力した情報でログインする．
