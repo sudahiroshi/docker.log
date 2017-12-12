@@ -899,7 +899,7 @@ suda@debian:~$
 このように，異なるOS環境下でコマンドを実行することができます．
 上記の例ではインタラクティブに/bin/shを起動しましたが，通常は非インタラクティブにサーバプログラムを動かします．
 
-## サービスを動かしてみる
+## nginxを動かしてみる
 
 Dockerでは，様々なサービスのコンテナが[Docker Hub](https://hub.docker.com/)に用意されている．
 上記サイトを開いて，検索窓に```nginx```と入力すると，標準的な```nginx```に加え，Proxy用の```jwilder/nginx-proxy```なども用意されている．
@@ -936,7 +936,7 @@ suda@debian:~$
 
 ブラウザから```http://localhost:10080```にアクセスすると，```Welcome to nginx!```の画面が表示されるはずである．
 
-起動中のコンテナを確認する．
+### 起動中のコンテナを確認する．
 
 
 ```
@@ -950,10 +950,64 @@ suda@debian:~$
 もしこのオプションがなかった場合，NAMESにはCONTAINER IDと同じ文字列が入るので，以下のコマンドを使用する際に長い文字列を入力する必要がある．
 
 （ただし，先頭数文字を打ち込めば良いので，見づらいだけで大きな問題にはならない）
-コンテナを止める．
+
+### コンテナを止める．
 
 ```
 suda@debian:~$ sudo docker stop nginx
 nginx
 suda@debian:~$
 ```
+
+### コンテナを削除する
+
+コンテナを止めただけでは残骸が残っているので，残骸を削除する．
+残っている理由は，残骸を再度コンテナ化して利用するためである．
+起動時に```--rm```オプションを付けておけば，この作業は不要である．
+
+```
+suda@debian:~$ sudo docker rm nginx
+nginx
+suda@debian:~$
+```
+
+### Webページのデータを差し替える
+
+ここでは，debianの```/home/suda/html```というディレクトリを作り，その中にWebページのデータ（index.htmlなど）が有るものとする．
+さて，肝心のnginxコンテナ内のWebページのデータの在り処であるが，Debian9にnginxパッケージをインストールした場合は```/var/www/html```であった．
+これに対してnginxコンテナでは，```/usr/share/nginx/html```に置かれている．
+これを踏まえた上で，```/home/suda/html```をマウントさせて実行する．
+
+増えたオプションは以下の通り
+
+|単語|意味|
+|-|-|
+|-d|停止時に残骸を自動的に削除|
+|-v /home/suda/html:/usr/hsare/nginx/html|コロンよりも前のディレクトリをコンテナ内のコロン以後のディレクトリにディレクトリにマウント|
+
+この状態でWebブラウザから```http://localhost:10080```にアクセスすると，Webページの内容が変わっているはずである．
+
+```
+suda@debian:~$ sudo docker run --name nginx -p 10080:80 -d --rm -v /home/suda/html:/usr/share/nginx/html nginx
+75084fd62965e183aa915f719d017fbde45ff7e17783244eac8878bba46309e5
+suda@debian:~$
+```
+
+### コンテナにログインしたい
+
+通常のUNIX/Linuxであれば，nginxを動かしているOSにログインしてメンテナンスすることが不通である．
+それに対してDockerを使用した場合は，1コンテナ＝1プロセスを前提に話が進んでいく．
+これは，コンテナの独立性を高め，再利用可能にしているためである．
+それでは，コンテナ内の設定ファイルを読みたい場合にどうすれば良いか？という疑問が湧く．
+そのような場合は，nginxを起動せずに，インタラクティブモードで/bin/bashを起動すれば良い．
+
+具体的には，コンテナを停止・残骸を削除した状態で，以下のように起動すれば良い．
+
+```
+suda@debian:~$ sudo docker run --name nginx -p 10080:80 --rm -it -v /home/suda/html:/var/www/html nginx /bin/bash
+root@ddfec24dff54:/# ls
+bin  boot  dev	etc  home  lib	lib64  media  mnt  opt	proc  root  run  sbin  srv  sys  tmp  usr  var
+root@ddfec24dff54:/#
+```
+
+後は，いつものように設定ファイルを確認したり，Webページのデータがきちんとマウントされているか確認すれば良い確認すれば良い．
