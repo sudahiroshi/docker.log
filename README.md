@@ -836,3 +836,124 @@ suda@debian:~$
 ```
 
 上記のようなメッセージが表示された方，おめでとうございます．
+
+
+# Dockerを利用してサービスを立ち上げる．
+
+## まずはインタラクティブなコンテナを起動する
+
+Debian上に，別のディストリビューションのコンテナを起動します．
+ここでは，軽量なLinuxの一つであるalpineを起動し，シェルとして/bin/shを使用する．
+
+|単語|意味|
+|-|-|
+|docker|dockerコマンド|
+|run|コンテナを実行|
+|-it|インタラクティブモードで実行|
+|alpine|コンテナ名|
+|bin/sh|実行するコマンド|
+
+
+```
+suda@debian:~$ docker run -it alpine bin/sh
+Unable to find image 'alpine:latest' locally
+latest: Pulling from library/alpine
+2fdfe1cd78c2: Pull complete
+Digest: sha256:ccba511b1d6b5f1d83825a94f9d5b05528db456d9cf14a1ea1db892c939cda64
+Status: Downloaded newer image for alpine:latest
+/ #
+```
+
+プロンプトが```/ #```となっているのは，alpineの設定です．
+この状態で```ls```や```ps```などを実行すると，元々のdebianとはファイル配置が異なることを実感できます．
+終了は```exit```です．
+
+```
+/ # ls
+bin    dev    etc    home   lib    media  mnt    proc   root   run    sbin   srv    sys    tmp    usr    var
+/ # ps
+PID   USER     TIME   COMMAND
+    1 root       0:00 /bin/sh
+    6 root       0:00 ps
+/ # ifconfig -a
+eth0      Link encap:Ethernet  HWaddr 02:42:AC:11:00:03
+          inet addr:172.17.0.3  Bcast:0.0.0.0  Mask:255.255.0.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:8 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:648 (648.0 B)  TX bytes:0 (0.0 B)
+
+lo        Link encap:Local Loopback
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+
+/ # exit
+suda@debian:~$
+```
+
+このように，異なるOS環境下でコマンドを実行することができます．
+上記の例ではインタラクティブに/bin/shを起動しましたが，通常は非インタラクティブにサーバプログラムを動かします．
+
+## サービスを動かしてみる
+
+Dockerでは，様々なサービスのコンテナが[Docker Hub](https://hub.docker.com/)に用意されている．
+上記サイトを開いて，検索窓に```nginx```と入力すると，標準的な```nginx```に加え，Proxy用の```jwilder/nginx-proxy```なども用意されている．
+書式は```作者```/```コンテナ名```となっている．作者が無いものはDocker社が用意したコンテナである．
+
+それでは実際にnginxを起動してみよう．
+ここでは，VirtualBoxの設定で，ホストOS側の10080番ポートをゲストOSの10080番ポートにフォワードするよう設定してあるものとする．
+
+|単語|意味|
+|-|-|
+|docker|dockerコマンド|
+|run|コンテナを実行|
+|--name nginx|起動しているコンテナ名をnginxとする|
+|-p 10080:80|debianの10080番ポートをコンテナの80番ポートにフォワードする|
+|-d|デーモン（裏で動くプロセス）として起動|
+|nginx|コンテナ名|
+
+```
+suda@debian:~$ sudo docker run --name nginx -p 10080:80 -d nginx
+[sudo] suda のパスワード:
+Unable to find image 'nginx:latest' locally
+latest: Pulling from library/nginx
+e7bb522d92ff: Pull complete
+0f4d7753723e: Pull complete
+91470a14d63f: Pull complete
+Digest: sha256:25623adabe83582ed4261d975786627033a0a3a4f3656d784f6b9b03b0bc5010
+Status: Downloaded newer image for nginx:latest
+33328468f5b95512323a0c81f53e27b6a2b4b3a292a5ad7fb0b5f928b4624e2c
+suda@debian:~$ sudo docker ps
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                NAMES
+33328468f5b9        nginx               "nginx -g 'daemon ..."   28 seconds ago      Up 27 seconds       0.0.0.0:80->80/tcp   nginx
+suda@debian:~$
+```
+
+ブラウザから```http://localhost:10080```にアクセスすると，```Welcome to nginx!```の画面が表示されるはずである．
+
+起動中のコンテナを確認する．
+
+
+```
+suda@debian:~$ sudo docker ps
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                   NAMES
+59f68787f964        nginx               "nginx -g 'daemon ..."   6 seconds ago       Up 6 seconds        0.0.0.0:10080->80/tcp   nginx
+suda@debian:~$
+```
+
+ここで，NAMESの項目にnginxという文字列が入っているのは，起動時に```--name nginx```として指定したことによる．
+もしこのオプションがなかった場合，NAMESにはCONTAINER IDと同じ文字列が入るので，以下のコマンドを使用する際に長い文字列を入力する必要がある．
+
+（ただし，先頭数文字を打ち込めば良いので，見づらいだけで大きな問題にはならない）
+コンテナを止める．
+
+```
+suda@debian:~$ sudo docker stop nginx
+nginx
+suda@debian:~$
+```
