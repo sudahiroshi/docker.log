@@ -1091,3 +1091,55 @@ suda@debian:~$ sudo docker run --name gogs --rm -p 3000:3000 -d -v data:/data go
 3889c7df63b33e2eb669d6e298f134b4c75376d1a0b37ccde68f5bd1696db72e
 suda@debian:~$
 ```
+
+## Dockerfileを覗いてみる
+
+Dockerを使用してサービスを立ち上げるための設定ファイルは```Dockerfile``` である．
+例えばgogsのDockerfileは以下のURLで確認できる．
+
+[gogs/gogs](https://hub.docker.com/r/gogs/gogs/~/dockerfile/)
+
+Dockerfileに使われている単語の意味を以下に示す．
+詳しくは下記URLを参照すること．
+
+[Dockerfileリファレンス](http://docs.docker.jp/engine/reference/builder.html)
+
+単語 | 意味
+-|-
+FROM | 基となるイメージ名
+ADD | ネット経由でダウンロードしたファイル　または　ローカルのファイルをイメージ内の指定されたディレクトリに加える
+RUN | 基となるイメージに対してコマンドを実行する
+ENV | 環境変数の定義
+COPY | ローカルのファイルをイメージ内にコピーする
+WORKDIR | イメージ内のディレクトリを指定し，そこでコマンドを実行する
+VOLUME | マウントポイント
+EXPOSE | 外からアクセスできるポート番号
+ENTRYPOINT | コンテナ起動時に実行するコマンド
+CMD | コンテナ起動時に実行するコマンド
+
+ENTRYPOINTとCMDの両方が書かれている場合，ENTRYPOINTが実行コマンドになり，CMDがそのオプションとなる．
+CMDは```docker run```時にコマンドを書くと上書きされる．
+
+gogsコンテナは```alpine:3.5```というイメージを基に，```ADD```や```COPY```で指定されたファイルを加え，```RUN```で指定されたコマンドを実行した結果できあがる．
+その後，```VOLUME```，```EXPOSE```に書かれている設定を考慮しながら```ENTRYPOINT```，```CMD```に書かれているコマンドを実行する．
+つまり，Dockerfileはイメージを作成するための手順書であり，実行方法のメモである，と思えば理解も楽である．
+
+基となるイメージは，たいていalpineやDebianが使われている．
+Debianの場合は，バージョンを表すコード名が用いられるので，最新版なら```stretch```と書かれている．
+
+## 複数のサービスの連携
+
+単独のサービスとして，nginxやGogsを立ち上げてみた．
+本来，これらのサービスは連携させて運用することが普通である．
+Gogsだけ見ても，本来はGogsとDBMSを連携させるべきである．
+
+このような場合はDockerfileだけでは記述できないので，複数のサービスを連携させて立ち上げる仕組みが必要となる．
+実際に，```オーケストレーションツール```という名前で，幾つかの実装が存在する．
+Docker標準では```Docker Compose```と```Swarm```いう仕組みが用意されており，他にも```Kubernetes```や```Cattle```などが存在している．
+
+使うべきオーケストレーションツールは，今のところKubernetesが最適と言われている．
+これは，クラウド環境下でコンテナを運用するための様々な仕組みが用意されており，それらと連携を図る際に都合が良いからである．
+とは言え，Kubernetesの環境構築は色々と厄介なので，ここではDocker Composeを取り上げる．
+GoogleやAmazonのクラウド環境を使える立場であれば，迷わずKubernetesを使用するべきである．
+
+というわけで，Docker Composeはスルーする．
