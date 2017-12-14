@@ -1064,3 +1064,30 @@ Dec 12 10:44:40 syslogd started: BusyBox v1.25.1
 
 必要事項を入力して```新規アカウントを作成```をクリックすると，再度ログイン画面になる．
 先程入力した情報でログインする．
+
+## データの扱いを楽にする
+
+このままでは，Gogsのデータがローカルのファイル上に置かれるのでポータビリティ（データを保持したまま環境を移行するなど）がよろしくありません．
+そこで，```volume```を使用して，ポータビリティ性を向上させましょう．
+ただし，今回はお試しとして，ローカルファイルシステム上にvolumeを作成します．
+本来の使い方ではデータ置き場をNFS上にするとか，クラウドの機能を利用するなどを行い，ホストを跨いで利用できるようにします．
+
+まずはvolumeを作成します．
+volumeとは，コンテナに依存しない，独立したディスクというイメージです．
+ここでは```data```という名前のvolumeを作っています．
+
+
+```
+suda@debian:~$ sudo docker volume create --name data
+data
+suda@debian:~$
+```
+
+上記で作成したvolumeを使用して，gogsを起動します．
+オプションの```-v data:/data```がvolume名dataを/dataにマウントして使用することを表します．
+
+```
+suda@debian:~$ sudo docker run --name gogs --rm -p 3000:3000 -d -v data:/data gogs/gogs
+3889c7df63b33e2eb669d6e298f134b4c75376d1a0b37ccde68f5bd1696db72e
+suda@debian:~$
+```
