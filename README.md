@@ -1140,6 +1140,4 @@ Docker標準では```Docker Compose```と```Swarm```いう仕組みが用意さ�
 使うべきオーケストレーションツールは，今のところKubernetesが最適と言われている．
 これは，クラウド環境下でコンテナを運用するための様々な仕組みが用意されており，それらと連携を図る際に都合が良いからである．
 とは言え，Kubernetesの環境構築は色々と厄介なので，ここではDocker Composeを取り上げる．
-GoogleやAmazonのクラウド環境を使える立場であれば，迷わずKubernetesを使用するべきである．
-
-というわけで，Docker Composeはスルーする．
+GoogleやAmazonのクラウド環境を使える立場であれば，迷わずKubernetesを使用するべきであるが動作を理解するためにはDocker Composeの方が適しているため絵ある。
