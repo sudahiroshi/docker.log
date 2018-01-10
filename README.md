@@ -92,11 +92,11 @@ suda@debian:~$
 
 ```
 suda@debian:~$ sudo apt-get install \
->      apt-transport-https \
->      ca-certificates \
->      curl \
->      gnupg2 \
->      software-properties-common
+      apt-transport-https \
+      ca-certificates \
+      curl \
+      gnupg2 \
+      software-properties-common
 パッケージリストを読み込んでいます... 完了
 依存関係ツリーを作成しています
 状態情報を読み取っています... 完了
@@ -498,9 +498,9 @@ suda@debian:~$
 
 ```
 suda@debian:~$ sudo add-apt-repository \
->    "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
->    $(lsb_release -cs) \
->    stable"
+    "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
+    $(lsb_release -cs) \
+    stable"
 suda@debian:~$
 ```
 
@@ -1140,4 +1140,196 @@ Docker標準では```Docker Compose```と```Swarm```いう仕組みが用意さ�
 使うべきオーケストレーションツールは，今のところKubernetesが最適と言われている．
 これは，クラウド環境下でコンテナを運用するための様々な仕組みが用意されており，それらと連携を図る際に都合が良いからである．
 とは言え，Kubernetesの環境構築は色々と厄介なので，ここではDocker Composeを取り上げる．
-GoogleやAmazonのクラウド環境を使える立場であれば，迷わずKubernetesを使用するべきであるが動作を理解するためにはDocker Composeの方が適しているため絵ある。
+GoogleやAmazonのクラウド環境を使える立場であれば，迷わずKubernetesを使用するべきであるが動作を理解するためにはDocker Composeの方が適しているためである。
+
+### Docker Composeのインストール
+
+まずはDocker Composeをインストールします．
+apt-getコマンドでもインストールできるようですが，多数のパッケージに依存していてディスク容量を使ってしますので，公式で配布されているバイナリをダウンロードします．
+執筆時の最新バージョンは1.18.0のようです．
+
+
+```
+suda@debian:~$ sudo curl -L https://github.com/docker/compose/releases/download/1.18.0/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   617    0   617    0     0    714      0 --:--:-- --:--:-- --:--:--   714
+100 8280k  100 8280k    0     0  1664k      0  0:00:04  0:00:04 --:--:-- 2143k
+suda@debian:~$ sudo docker-compose --version
+docker-compose version 1.18.0, build 8dd22a9
+suda@debian:~$
+```
+
+### Docker ComposeによるGogsのインストール
+
+それでは早速Docker Composeを使ってみましょう．
+ここでは，先程インストールしたGogsをインストールしてみます．
+と言っても先ほどと同じではつまらないので，今回はDBMSと連携させてみましょう．
+以下のURLの設定ファイルを使用します．
+
+[ahromis/docker-compose.yml](https://gist.github.com/ahromis/4ce4a58623847ca82cb1b745c2f83c82)
+
+Docker Composeの基本事項ですが，設定ファイルは```docker-compose.yml```という名前です．
+拡張子に現れているように，YAMLフォーマットです．
+
+以下のようにダウンロードします．
+
+```
+suda@debian:~$ curl -L https://gist.githubusercontent.com/ahromis/4ce4a58623847ca82cb1b745c2f83c82/raw/31e8ced3d7e08c602a1c0ca8994c063994971c7f/docker-compose.yml -o docker-compose.yml
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   732  100   732    0     0   2039      0 --:--:-- --:--:-- --:--:--  2044
+suda@debian:~$ ls
+docker-compose.yml
+suda@debian:~$
+```
+
+以下に内容を示します．
+大雑把に解説しておくと，```services```で起動するプログラムに関することを，```networkds```でネットワークに関することを，```volumes```でデータコンテナに関することを設定しています．
+この中で```services```では，```postgres```と```gogs```というプログラムを起動することが書かれています．
+また```networks```では，```gogs```という名前のネットワークを作っています．
+さらに```volume```では，```db-data```と```gogs-data```を作っています．
+また，```${```と```}```で囲まれた部分は，docker-compose実行時に環境変数で値を渡す部分です．
+
+```
+version: '2'
+services:
+    postgres:
+      image: postgres:9.5
+      restart: always
+      environment:
+       - "POSTGRES_USER=${POSTGRES_USER}"
+       - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+       - "POSTGRES_DB=gogs"
+      volumes:
+       - "db-data:/var/lib/postgresql/data"
+      networks:
+       - gogs
+    gogs:
+      image: gogs/gogs:latest
+      restart: always
+      ports:
+       - "10022:22"
+       - "3000:3000"
+      links:
+       - postgres
+      environment:
+       - "RUN_CROND=true"
+      networks:
+       - gogs
+      volumes:
+       - "gogs-data:/data"
+      depends_on:
+       - postgres
+
+networks:
+    gogs:
+      driver: bridge
+
+volumes:
+    db-data:
+      driver: local
+    gogs-data:
+      driver: local
+```
+
+それでは起動してみましょう．
+先に述べたように，起動時に環境変数を通じて値をセットしつつ，docker-composeを実行します．
+ここでは，PostgreSQLのユーザ名として```postgres```を，そのユーザのパスワードとして```sudasuda```を指定しています．
+試したところ，ユーザ名はpostgresでないときちんと使えませんでした．
+パスワードは各自設定してください．
+
+```
+suda@debian:~$ sudo POSTGRES_USER=postgres POSTGRES_PASSWORD=sudasuda docker-compose up
+Creating network "temp_gogs" with driver "bridge"
+Creating volume "temp_db-data" with local driver
+Creating temp_postgres_1 ... done
+Creating temp_postgres_1 ...
+Creating temp_gogs_1     ... done
+Attaching to temp_postgres_1, temp_gogs_1
+postgres_1  | The files belonging to this database system will be owned by user "postgres".
+postgres_1  | This user must also own the server process.
+postgres_1  |
+postgres_1  | The database cluster will be initialized with locale "en_US.utf8".
+postgres_1  | The default database encoding has accordingly been set to "UTF8".
+postgres_1  | The default text search configuration will be set to "english".
+postgres_1  |
+postgres_1  | Data page checksums are disabled.
+postgres_1  |
+postgres_1  | fixing permissions on existing directory /var/lib/postgresql/data ... ok
+postgres_1  | creating subdirectories ... ok
+postgres_1  | selecting default max_connections ... 100
+postgres_1  | selecting default shared_buffers ... 128MB
+postgres_1  | selecting dynamic shared memory implementation ... posix
+postgres_1  | creating configuration files ... ok
+gogs_1      | usermod: no changes
+gogs_1      | init:crond  | Cron Daemon (crond) will be run as requested by s6
+gogs_1      | Jan 10 12:04:05 syslogd started: BusyBox v1.25.1
+gogs_1      | Jan 10 12:04:06 sshd[32]: Server listening on :: port 22.
+gogs_1      | Jan 10 12:04:06 sshd[32]: Server listening on 0.0.0.0 port 22.
+postgres_1  | creating template1 database in /var/lib/postgresql/data/base/1 ... ok
+postgres_1  | initializing pg_authid ... ok
+postgres_1  | initializing dependencies ... ok
+postgres_1  | creating system views ... ok
+postgres_1  | loading system objects' descriptions ... ok
+postgres_1  | creating collations ... ok
+postgres_1  | creating conversions ... ok
+postgres_1  | creating dictionaries ... ok
+postgres_1  | setting privileges on built-in objects ... ok
+postgres_1  | creating information schema ... ok
+postgres_1  | loading PL/pgSQL server-side language ... ok
+postgres_1  | vacuuming database template1 ... ok
+postgres_1  | copying template1 to template0 ... ok
+postgres_1  | copying template1 to postgres ... ok
+postgres_1  | syncing data to disk ... ok
+postgres_1  |
+postgres_1  | WARNING: enabling "trust" authentication for local connections
+postgres_1  | You can change this by editing pg_hba.conf or using the option -A, or
+postgres_1  | --auth-local and --auth-host, the next time you run initdb.
+postgres_1  |
+postgres_1  | Success. You can now start the database server using:
+postgres_1  |
+postgres_1  |     pg_ctl -D /var/lib/postgresql/data -l logfile start
+postgres_1  |
+postgres_1  | waiting for server to start....LOG:  could not bind IPv6 socket: Cannot assign requested address
+postgres_1  | HINT:  Is another postmaster already running on port 5432? If not, wait a few seconds and retry.
+postgres_1  | LOG:  database system was shut down at 2018-01-10 12:04:06 UTC
+postgres_1  | LOG:  MultiXact member wraparound protections are now enabled
+postgres_1  | LOG:  database system is ready to accept connections
+postgres_1  | LOG:  autovacuum launcher started
+postgres_1  |  done
+postgres_1  | server started
+postgres_1  | CREATE DATABASE
+postgres_1  |
+postgres_1  | ALTER ROLE
+postgres_1  |
+postgres_1  |
+postgres_1  | /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+postgres_1  |
+postgres_1  | LOG:  received fast shutdown request
+postgres_1  | LOG:  aborting any active transactions
+postgres_1  | LOG:  autovacuum launcher shutting down
+postgres_1  | LOG:  shutting down
+postgres_1  | waiting for server to shut down....LOG:  database system is shut down
+postgres_1  |  done
+postgres_1  | server stopped
+postgres_1  |
+postgres_1  | PostgreSQL init process complete; ready for start up.
+postgres_1  |
+postgres_1  | LOG:  database system was shut down at 2018-01-10 12:04:09 UTC
+postgres_1  | LOG:  MultiXact member wraparound protections are now enabled
+postgres_1  | LOG:  database system is ready to accept connections
+postgres_1  | LOG:  autovacuum launcher started
+gogs_1      | 2018/01/10 12:04:17 [ WARN] Custom config '/data/gogs/conf/app.ini' not found, ignore this if you're running first time
+gogs_1      | 2018/01/10 12:04:17 [TRACE] Custom path: /data/gogs
+gogs_1      | 2018/01/10 12:04:17 [TRACE] Log path: /app/gogs/log
+gogs_1      | 2018/01/10 12:04:17 [TRACE] Build Time: 2017-11-22 08:19:49 UTC
+gogs_1      | 2018/01/10 12:04:17 [TRACE] Build Git Hash:
+gogs_1      | 2018/01/10 12:04:17 [TRACE] Log Mode: Console (Trace)
+gogs_1      | 2018/01/10 12:04:17 [ INFO] Gogs 0.11.34.1122
+gogs_1      | 2018/01/10 12:04:17 [ INFO] Cache Service Enabled
+gogs_1      | 2018/01/10 12:04:17 [ INFO] Session Service Enabled
+gogs_1      | 2018/01/10 12:04:17 [ INFO] SQLite3 Supported
+gogs_1      | 2018/01/10 12:04:17 [ INFO] Run Mode: Development
+gogs_1      | 2018/01/10 12:04:17 [ INFO] Listen: http://0.0.0.0:3000
+```
