@@ -1386,9 +1386,9 @@ services | サービス設定 | 実際に動かすコンテナに関する設定
 networks | ネットワーク設定 | コンテナ間のネットワークを宣言する
 volumes | ボリューム設定 | ボリュームコンテナを宣言する
 
-### networksとvolumes
+### networks
 
-まずはnetworksとvolumesから見ていきましょう．
+まずはnetworksから見ていきましょう．
 以下の例では，```gogs```という名前のネットワークを宣言しています．
 ここでは1つだけ宣言していますが，複数個のネットワークを宣言してコンテナ毎にネットワークを分けることも可能です．
 その次にある```dirver```の項目ですが，この設定ファイルでは```bridge```となっています．
@@ -1402,6 +1402,8 @@ networks:
       driver: bridge
 ```
 
+### volumes
+
 続いて```volumes```です．
 以下の例では，```db-data```というボリュームと```gogs-data```というボリュームを宣言しています．
 名前から想像できると思いますが，PostgreSQLのデータを保存しておくボリュームと，Gogsのデータを保存しておくボリュームです．
@@ -1414,4 +1416,54 @@ volumes:
       driver: local
     gogs-data:
       driver: local
+```
+
+### services
+
+最後に```services```です．
+第2回想を見ると，```postgres```と```gogs```という2つのサービスを動かそうとしていることが分かります．
+ですので，まずはそれぞれのサービスを分けて考えます．
+
+項目 | 説明
+-|-|-
+image | 使用するDockerイメージを指定する
+restart | 何か有った場合に再起動するか指定する（no / always / no-failure）
+ports | 外部からアクセスできるポート番号と内部で使用するポート番号を指定する
+links | 指定したコンテナと通信することを示す
+environment | コンテナの環境変数を設定する
+volumes | マウントするファイルシステムを指定する
+networkds | 使用するネットワークを指定する
+depends_on | 指定しているコンテナが起動するのを待ってから起動する
+
+
+
+```
+services:
+    postgres:
+      image: postgres:9.5
+      restart: always
+      environment:
+       - "POSTGRES_USER=${POSTGRES_USER}"
+       - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+       - "POSTGRES_DB=gogs"
+      volumes:
+       - "db-data:/var/lib/postgresql/data"
+      networks:
+       - gogs
+    gogs:
+      image: gogs/gogs:latest
+      restart: always
+      ports:
+       - "10022:22"
+       - "3000:3000"
+      links:
+       - postgres
+      environment:
+       - "RUN_CROND=true"
+      networks:
+       - gogs
+      volumes:
+       - "gogs-data:/data"
+      depends_on:
+       - postgres
 ```
