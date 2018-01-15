@@ -1024,7 +1024,7 @@ Webサーバだけでは，サービスを起動した感じがしないので�
 
 ```
 suda@debian:~$ mkdir -p gogs
-suda@debian:~$ sudo docker run -name gogs -d --rm -p 3000:3000 -v /home/suda/gogs:/data gogs/gogs
+suda@debian:~$ sudo docker run --name gogs -d --rm -p 3000:3000 -v /home/suda/gogs:/data gogs/gogs
 Unable to find image 'gogs/gogs:latest' locally
 latest: Pulling from gogs/gogs
 b1f00a6a160c: Pull complete
@@ -1155,6 +1155,7 @@ suda@debian:~$ sudo curl -L https://github.com/docker/compose/releases/download/
                                  Dload  Upload   Total   Spent    Left  Speed
 100   617    0   617    0     0    714      0 --:--:-- --:--:-- --:--:--   714
 100 8280k  100 8280k    0     0  1664k      0  0:00:04  0:00:04 --:--:-- 2143k
+suda@debian:~$ sudo chmod +x /usr/local/bin/docker-compose
 suda@debian:~$ sudo docker-compose --version
 docker-compose version 1.18.0, build 8dd22a9
 suda@debian:~$
