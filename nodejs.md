@@ -210,9 +210,9 @@ suda@debian:~/node_test$
 app.js | Webサーバのプログラム本体
 package.json | 必要なnode.js関連のパッケージの一覧
 bin | ？
-public | Webページなどのデータを入れておく
+public | 画像やjsファイルなど静的なファイルを入れておく
 routes | URLによって処理を分けるためのプログラムを入れておく
-views | jsファイルやcssなどを入れておく
+views | 整形される前のWebページを入れておく
 
 次に，必要なパッケージをインストールします．
 パッケージとは，ライブラリのようなものと思ってください．
@@ -237,4 +237,27 @@ suda@debian:~/node_test$ npm start
 > node ./bin/www
 ```
 
-この状態でWebブラウザから```http://localhost:3000/```に接続すると"Express"などと表示される．
+この状態でWebブラウザから```http://localhost:3000/```に接続すると"Express"などと表示されます．
+終了はctrl+cです．
+
+## Chatを作る
+
+node.jsには，socket.ioというリアルタイムにWebサーバ・クライアント間で通信を行うためのパッケージが用意されています．
+ここでは，node_testを拡張して，socket.ioを使ってChatを作成してみます．
+参考までに，socket.ioを使ったChatのプログラムは，node.jsのサンプルとしてよく使われる題材です．
+
+### socket.ioのインストール
+
+まずはsocket.ioをインストールします．
+ここでは，インストールしつつ，node_testのパッケージ情報にsocket.ioを追記します．
+
+```
+suda@debian:~/node_test$ npm install --save socket.io
+
+> uws@0.14.5 install /home/suda/test/node_modules/uws
+> node-gyp rebuild > build_log.txt 2>&1 || exit 0
+
++ socket.io@2.0.4
+added 33 packages in 1.522s
+suda@debian:~/node_test$
+```
