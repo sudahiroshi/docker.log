@@ -243,8 +243,21 @@ suda@debian:~/node_test$ npm start
 ## Chatを作る
 
 node.jsには，socket.ioというリアルタイムにWebサーバ・クライアント間で通信を行うためのパッケージが用意されています．
+socket.ioで利用できるプロトコルとして，WebSocket，AJAX（XML HTTP Request），JSONPなど主要なものを網羅しており，自動的に選択してくれます．
 ここでは，node_testを拡張して，socket.ioを使ってChatを作成してみます．
 参考までに，socket.ioを使ったChatのプログラムは，node.jsのサンプルとしてよく使われる題材です．
+
+Chatを作るにあたって必要な機能に以下のようなものがあります．
+なお，最終的にどのようなChatを作成するか考えて，機能の追加・削除をするものとします．
+
+サーバ/クライアント | 機能
+-|-
+サーバ | ChatのWebページを用意
+サーバ | クライアントから送られてきた投稿を他のクライアントに通知する
+サーバ | 投稿内容をDBに格納
+サーバ | 過去の投稿内容を引っ張り出す
+クライアント | 投稿機能
+クライアント | 他社の投稿を受け取り表示
 
 ### socket.ioのインストール
 
@@ -261,3 +274,116 @@ suda@debian:~/node_test$ npm install --save socket.io
 added 33 packages in 1.522s
 suda@debian:~/node_test$
 ```
+
+### socket.ioを使って投稿を他のクライアントに通知する（サーバ側）
+
+express generatorを利用してひな形を用意した場合，メインとなる通信制御は```node_chat/bin/www```で行っています．
+長いので割愛しますが，このファイルの最後に以下の内容を追加してください．
+
+```javascript
+var io = require('socket.io').listen(server);
+io.sockets.on('connection', function(socket) {
+  console.log("new connection");
+  socket.on('message', function(msg) {
+    socket.emit('message', msg);
+    socket.broadcast.emit('message',msg);
+  });
+  socket.on('disconnect', function() {
+    console.log('disconnected');
+  });
+});
+```
+
+### ChatのWebページを用意する（サーバ側）
+
+次にChatのWebページを用意します．
+元々expressでは，サーバサイドで処理をした結果をHTML形式で送信することが前提になっていますが，ここでは一旦静的なWebページに対してクライアントサイドのJavaScriptでデータの送受信を行う形で設計するものとします．
+その場合，```node_test/public```の下にHTMLファイルを置いておくだけで良いです．
+ここでは```chat.html```とします．
+
+一旦，socket.ioのライブラリを読み込むようにして，コンソールから動作を確認してみましょう．
+動作確認用のHTMLを示します．
+コメントアウトされている部分は，後ほど使用します．
+
+```html
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <title>Express</title>
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- <script src="/public/javascripts/chat.js"></script> -->
+  </head>
+  <body>
+    <h1>Chat by socket.io</h1>
+    <div id="connectId"></div>
+    <input type="text" id="message" value="">
+    <input type="button" id="send" value="send">
+    <input type="button" id="disconnect" value="disconnect">
+    <div id="receiveMsg"></div>
+  </body>
+</html>
+```
+
+この状態では，socket.ioを使える状態ですが，実際には何も行いません．
+コンソールを開いて以下のように実行してみてください．
+分かりにくいですが，//から始まっている行はコメントなので入力しないでください．
+入力する行は>から始まっている行です．
+
+```
+// (1)socket.ioの初期化と接続．この段階でサーバサイドに'new connection'が表示される
+> var socket=io();
+undefined
+
+// (2)サーバから何か送られてきたら，その内容をコンソールに表示する
+> socket.addEventListener('message', function(msg) { console.log(msg); });
+r {io: r, nsp: "/", json: r, ids: 0, acks: {…}, …}
+
+// (3)サーバにメッセージを送ってみる
+> socket.emit('message', 'test');
+r {io: r, nsp: "/", json: r, ids: 0, acks: {…}, …}
+test    // ←サーバに送った内容がそのまま送り返される．(2)により表示される．
+```
+
+この状態で，複数のWebブラウザを開いて（別々のブラウザでも良いし，1つのブラウザ内で複数のウィンドウを開いても良い），それぞれで上記内容を入力すると，コンソール内で会話できます．
+
+
+次に通信を行うjsを```node_chat/public/javascripts/chat.js```とという名前で作成します．
+ついでに，chat.htmlのコメントアウトされている部分を通常の行に戻してください．
+
+```javascript
+// connect to server
+var socket = io.connect();
+
+// when connected
+socket.on( 'connect', function(msg) {
+  document.getElementById( "connectId" ).innerHTML = "your ID::" + socket.id;
+});
+
+// when receive a message
+socket.on( 'message', function(msg) {
+  document.getElementById( "receiveMsg" ).appendChild( document.createTextNode( msg  ) );
+  document.getElementById( "receiveMsg" ).appendChild( document.createElement( "br" ) );
+});
+
+
+window.addEventListener( 'load', function() {
+  // message sending
+  document.getElementById( 'send' ).addEventListener( 'click', function() {
+    var msg = document.getElementById( 'message' ).value;
+    console.log( msg );
+    socket.emit( 'message', msg );
+  });
+
+  // disconect
+  document.getElementById( 'disconnect' ).addEventListener( 'click', function() {
+    socket.send(socket.id + " has been disconected.");
+    socket.disconnect();
+    document.getElementById( "connectId" ).innerHTML = "Disconnected";
+  });
+});
+```
+
+サーバ上で```npm start```してから，Webブラウザで```http://localhost:3000/chat.html```に接続してください．
+きちんとsocket.ioの接続が確立するとIDが表示されます．
+複数のブラウザ（またはウィンドウ）を開いて，チャットを行ってみてください．
