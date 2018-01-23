@@ -312,7 +312,7 @@ io.sockets.on('connection', function(socket) {
     <title>Express</title>
     <link rel='stylesheet' href='/stylesheets/style.css' />
     <script src="/socket.io/socket.io.js"></script>
-    <!-- <script src="/public/javascripts/chat.js"></script> -->
+    <!-- <script src="/javascripts/chat.js"></script> -->
   </head>
   <body>
     <h1>Chat by socket.io</h1>
@@ -325,8 +325,9 @@ io.sockets.on('connection', function(socket) {
 </html>
 ```
 
+それではWebブラウザから```http://localhost:3000//chat```にアクセスしてください．
 この状態では，socket.ioを使える状態ですが，実際には何も行いません．
-コンソールを開いて以下のように実行してみてください．
+ブラウザのコンソールを開いて以下のように実行してみてください．
 分かりにくいですが，//から始まっている行はコメントなので入力しないでください．
 入力する行は>から始まっている行です．
 
