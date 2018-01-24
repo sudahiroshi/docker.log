@@ -302,3 +302,73 @@ suda@debian:~/work$ sudo docker run -it --rm -p 4000:4000 node_chat:1.1
 
 Webブラウザから```http://localhsot:4000/chat.html```にアクセスしてみましょう．
 うまく動いていればチャットの画面が表示されるはずです．
+
+## Docker Compose化する
+
+ここまでできると，起動のためのdockerコマンドが面倒と感じるようになってくると思います．
+これを解消するために，docker composeを使用します．
+本来のdocker composeは複数のコンテナを連携させるオーケストレーションの仕組みですが，起動を楽にする意味も含まれています．
+それではdocker-compose.ymlの例を示します．
+
+```
+version: '2'
+services:
+  node_chat:
+    build: .
+    environment:
+     - "PORT=4000"
+    ports:
+     - "4000:4000"
+```
+
+短いと思うかもしれませんが，単独のコンテナを起動するだけなのでこの程度で済んでいます．
+自前のDockerfileを扱うための記述が```build```です．
+この場合は，カレントディレクトリに有るDockerfileを使用することを示しています．
+他のディレクトリに存在するDockerfileを使ってサービスを起動することも可能です．
+
+それでは起動してみましょう．起動するためには以下のようにします．
+見て分かるように，docker-composeコマンドでサービスを起動すると，イメージの作成からサービスの起動までが実行されます．
+
+```
+suda@debian:~/work$ sudo docker-compose up
+Creating network "work_default" with the default driver
+Building node_chat
+Step 1/9 : FROM node:8.9.4-stretch
+ ---> a264e6327bde
+Step 2/9 : ENV HOME=/home/node
+ ---> Using cache
+ ---> 27f1735a713a
+Step 3/9 : WORKDIR $HOME
+ ---> Using cache
+ ---> 56b3346a0d08
+Step 4/9 : RUN git clone http://172.16.121.160:3000/suda/test
+ ---> Using cache
+ ---> d304e5853ad9
+Step 5/9 : WORKDIR $HOME/test
+ ---> Using cache
+ ---> 10c7cae75760
+Step 6/9 : RUN npm install
+ ---> Using cache
+ ---> a8d24c4378ff
+Step 7/9 : ENV PORT 4000
+ ---> Using cache
+ ---> b58ac8e270b6
+Step 8/9 : EXPOSE 4000
+ ---> Using cache
+ ---> 2abe6e3efc44
+Step 9/9 : CMD [ "npm", "start" ]
+ ---> Using cache
+ ---> da8b6eb13426
+Successfully built da8b6eb13426
+Successfully tagged work_node_chat:latest
+WARNING: Image for service node_chat was built because it did not already exist. To rebuild this image you must use `docker-compose build` or `docker-compose up --build`.
+Creating work_node_chat_1 ... done
+Attaching to work_node_chat_1
+node_chat_1  |
+node_chat_1  | > node-test@0.0.0 start /home/node/test
+node_chat_1  | > node ./bin/www
+```
+
+後は，作成したDockerfileとdocker-compose.ymlを，Gitサーバにアップロードしておくことを勧めます．
+その際，node_chat内に入れても良いですし，別々でも構いません．
+（今回の書き方は別のリポジトリに入れることを前提としていますが，少し変更するだけなので挑戦してみてください）
