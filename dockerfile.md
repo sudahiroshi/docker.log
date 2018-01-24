@@ -171,6 +171,134 @@ suda@debian:~/temp/node_chat$ PORT=4000 npm start
 > node ./bin/www
 ```
 
+途中で```npm install```しているのは，通常パッケージマネージャが存在する言語・環境の場合はパッケージ情報（package.json）だけをアップロードしておいて，サービスを立ち上げる際に公式サーバからダウンロードします．
+よって，ここでもその流儀に従って公式サイトよりダウンロードしています．
+ここで疑問が湧くかもしれませんが，作成したnode_testにはすでにパッケージがダウンロードされていました．
+リポジトリ上ではそれらのパッケージはどこに消えたのでしょうか？
+
+実は，```.gitignore```に管理対象外とするファイルやディレクトリを登録することができます．
+今回はGogs上でリポジトリを作成する際に```.gitignore```に```node```を指定してあるのでそれらのファイル（```node_modules```ディレクトリ）が管理対象外となっています．
+
 実行する際に```PORT=4000```としているのは，すでに3000番ポートを使っているので他のポートを割り当てるためです．
 なお，VirtualBoxのポートフォワードの設定に4000→4000を追加しておいてください．
 この状態でWebブラウザから```http://localhost:4000/chat.html```にアクセスすると，チャットが実行できるはずです．
+
+## Dockerfileの作成
+
+やっと準備が整ったので，次はDockerfileを作成してDocker化します．
+以前説明しましたが，基本的にDockerfileでは，インストール手順を順番に記述します．
+ここで，DockerHubに登録されているnodeのイメージを使えば，node.jsのインストールは不要です．
+[node](https://hub.docker.com/_/node/)を確認すると，様々な環境が揃っています．
+元々Debian9上で，node8.9.4を使って開発していたので，同じ環境（8.9.4-stretch）を使用しましょう．
+
+念のためDockerfileを覗いてみます．
+[nodejs/docker-node](https://github.com/nodejs/docker-node/blob/994f8286cb0efc92578902d5fd11182f63a59869/8/stretch/Dockerfile)
+ざっと見てみると，nodeというユーザを作っているので，このユーザを使ってサービスを動かすことにします．
+
+それでは，node8.9.4-stretchを使用するDockerfileを作ってみましょう．
+ディレクトリはホームディレクトリの直下にworkを作成して，ここに作ることにします．
+
+```
+suda@debian:~$ mkdir work
+
+suda@debian:~$ cd work
+```
+
+ファイルの内容は以下のとおりです．
+
+```
+FROM node:8.9.4-stretch
+```
+
+とりあえずこれだけでOKです．
+
+### Dockerfileに追記する
+
+続いて，Dockerfile上で目的とするリポジトリの内容をダウンロードして，さらに使用するパッケージをダウンロードしてみましょう．
+使用するユーザ名はnodeなので，作業するホームディレクトリは```/home/node```です．
+ここまでのDockerfileを示します．
+
+```
+FROM node:8.9.4-stretch
+
+ENV HOME=/home/node
+WORKDIR $HOME
+RUN git clone http://localhost:3000/suda/node_chat
+WORKDIR $HOME/node_chat
+RUN npm install
+```
+
+まずはここまでのDockerfileの動作を確認します．
+手元のDockerfileを使うためには，まずbuildします．
+
+```
+suda@debian:~/work$ sudo docker build -t node_chat:1.0 .
+Sending build context to Docker daemon  13.53MB
+Step 1/9 : FROM node:8.9.4-stretch
+ ---> a264e6327bde
+Step 2/9 : ENV HOME=/home/node
+ ---> Using cache
+ ---> 27f1735a713a
+Step 3/9 : WORKDIR $HOME
+ ---> Using cache
+ ---> 56b3346a0d08
+Step 4/9 : RUN git clone http://172.16.121.160:3000/suda/test
+ ---> Using cache
+ ---> d304e5853ad9
+Step 5/9 : WORKDIR $HOME/test
+ ---> Using cache
+ ---> 10c7cae75760
+Step 6/9 : RUN npm install
+ ---> Using cache
+ ---> a8d24c4378ff
+Successfully built da8b6eb13426
+Successfully tagged node_chat:1.0
+suda@debian:~/work$
+```
+
+無事にbuildできたら，```/bin/bash```を対話的に動かしてみましょう．
+具体的には```pwd```や```ls```などでファイルが有ることを確認します．
+
+```
+suda@debian:~/work$ sudo docker run -it --rm -p 4000:4000 node_chat:1.0 /bin/bash
+
+root@105d383d5491:~/test# pwd
+/home/node/test
+
+root@105d383d5491:~/test# ls
+README.md  app.js  bin  node_modules  package-lock.json  package.json  public  routes  views
+
+root@105d383d5491:~/test# exit
+exit
+suda@debian:~/work$
+```
+
+ここまでできていれば，後は実行の部分をDockerfileに追記します．
+最終的なDockerfileを以下に示します．
+（PORTが決め打ちなのは格好悪いのと応用が効かないので，後で直します）
+
+```
+FROM node:8.9.4-stretch
+
+ENV HOME=/home/node
+WORKDIR $HOME
+RUN git clone http://172.16.121.160:3000/suda/test
+WORKDIR $HOME/test
+RUN npm install
+ENV PORT 4000
+EXPOSE 4000
+CMD [ "npm", "start" ]
+```
+
+実行するためには，先ほどと同じようにbuild→runの流れになります．
+今度はバージョン番号を1.1にしましょう．
+
+```
+suda@debian:~/work$ sudo docker build -t node_chat:1.1 .
+（ログは省略）
+suda@debian:~/work$ sudo docker run -it --rm -p 4000:4000 node_chat:1.1
+（ログは省略）
+```
+
+Webブラウザから```http://localhsot:4000/chat.html```にアクセスしてみましょう．
+うまく動いていればチャットの画面が表示されるはずです．
