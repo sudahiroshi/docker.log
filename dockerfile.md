@@ -216,6 +216,47 @@ FROM node:8.9.4-stretch
 
 続いて，Dockerfile上で目的とするリポジトリの内容をダウンロードして，さらに使用するパッケージをダウンロードしてみましょう．
 使用するユーザ名はnodeなので，作業するホームディレクトリは```/home/node```です．
+
+ここで，Gogsの動いているホストは，Dockerで起動したホストとは別のIPアドレスを持っています．
+よって，GitサーバのIPアドレスとして，DebianのIPアドレスを調べて記載します．
+IPアドレスを調べるには，```ip address show```を使用します．
+実行例を以下に示します．
+Dockerをインストールすると，ネットワークインタフェースが増えるので見づらいですが，```ens33```が標準的なインタフェースです．
+よって，この例ではIPアドレスとして```172.16.121.160```を使用します．
+
+```
+suda@debian:~$ ip address show
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 00:0c:29:80:d8:eb brd ff:ff:ff:ff:ff:ff
+    inet 172.16.121.160/24 brd 172.16.121.255 scope global ens33
+       valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe80:d8eb/64 scope link
+       valid_lft forever preferred_lft forever
+3: docker0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default
+    link/ether 02:42:9c:b1:83:a1 brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::42:9cff:feb1:83a1/64 scope link
+       valid_lft forever preferred_lft forever
+7: veth9ef744b@if6: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default
+    link/ether 5a:e9:76:70:b8:6c brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet6 fe80::58e9:76ff:fe70:b86c/64 scope link
+       valid_lft forever preferred_lft forever
+32: br-874d40a2c02c: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default
+    link/ether 02:42:6b:bc:1a:80 brd ff:ff:ff:ff:ff:ff
+    inet 172.18.0.1/16 brd 172.18.255.255 scope global br-874d40a2c02c
+       valid_lft forever preferred_lft forever
+    inet6 fe80::42:6bff:febc:1a80/64 scope link
+       valid_lft forever preferred_lft forever
+suda@debian:~$
+```
+
 ここまでのDockerfileを示します．
 
 ```
@@ -223,7 +264,7 @@ FROM node:8.9.4-stretch
 
 ENV HOME=/home/node
 WORKDIR $HOME
-RUN git clone http://localhost:3000/suda/node_chat
+RUN git clone http://172.16.121.160:3000/suda/node_chat
 WORKDIR $HOME/node_chat
 RUN npm install
 ```
