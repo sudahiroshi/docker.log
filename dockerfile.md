@@ -341,7 +341,7 @@ suda@debian:~/work$ sudo docker run -it --rm -p 4000:4000 node_chat:1.1
 （ログは省略）
 ```
 
-Webブラウザから```http://localhsot:4000/chat.html```にアクセスしてみましょう．
+Webブラウザから```http://localhost:4000/chat.html```にアクセスしてみましょう．
 うまく動いていればチャットの画面が表示されるはずです．
 
 ## Docker Compose化する
