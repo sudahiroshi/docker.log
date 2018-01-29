@@ -283,10 +283,10 @@ Step 2/9 : ENV HOME=/home/node
 Step 3/9 : WORKDIR $HOME
  ---> Using cache
  ---> 56b3346a0d08
-Step 4/9 : RUN git clone http://172.16.121.160:3000/suda/test
+Step 4/9 : RUN git clone http://172.16.121.160:3000/suda/node_chat
  ---> Using cache
  ---> d304e5853ad9
-Step 5/9 : WORKDIR $HOME/test
+Step 5/9 : WORKDIR $HOME/node_chat
  ---> Using cache
  ---> 10c7cae75760
 Step 6/9 : RUN npm install
