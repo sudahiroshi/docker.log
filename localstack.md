@@ -30,7 +30,7 @@ suda@debian:~/localstack$ ls
 Dockerfile   MANIFEST.in  README.md  doc                 localstack        setup.py
 LICENSE.txt  Makefile     bin        docker-compose.yml  requirements.txt  tests
 
-suda@debian:~/localstack$ sudo TMPDIR=./tmp docker-compose up -d
+suda@debian:~/localstack$ sudo TMPDIR=./tmp LAMBDA_EXECUTOR=docker docker-compose up -d
 [sudo] suda のパスワード:
 Creating network "localstack_default" with the default driver
 Pulling localstack (localstack/localstack:latest)...
@@ -378,6 +378,42 @@ suda@debian:~/lambda$ cat result.log
 Hello from Lambdasuda@debian:~/lambda$
 suda@debian:~/lambda$
 ```
+
+## node.jsによるLambda
+
+test.js
+
+```
+'use strict';
+
+console.log('Loading function');
+
+exports.handler = function( event, context, callback ) {
+	console.log( "value1 = " + event.key1 );
+	console.log( "value2 = " + event.key2 );
+	callback( null, "successfull" );
+};
+```
+
+設定
+
+```
+suda@debian:~/node_lambda$ aws --endpoint-url=http://localhost:4574 --profile localstack lambda create-function --function-name="test" --runtime=nodejs6.10 --role=r1 --handler=test.handler --zip-file fileb://test.zip
+arn:aws:lambda:us-east-1:000000000000:function:test	test	test.handler	r1	nodejs6.10
+SECURITYGROUPIDS	None
+SUBNETIDS	None
+suda@debian:~/node_lambda$
+```
+
+確認
+
+```
+suda@debian:~/node_lambda$ aws lambda --endpoint-url=http://localhost:4574 --profile localstack invoke --function-name test2 --payload '{"key1":"value1", "key2":"value2", "key3":"value3"}' result.log
+200
+suda@debian:~/node_lambda$
+```
+
+
 
 
 
