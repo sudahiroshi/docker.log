@@ -413,6 +413,10 @@ suda@debian:~/node_lambda$ aws lambda --endpoint-url=http://localhost:4574 --pro
 suda@debian:~/node_lambda$
 ```
 
+## DynamoDB
+
+とりあえず[atlassian 製の AWS モックツール LocalStack をさわってみた](http://maroyaka.hateblo.jp/entry/2017/04/28/175712)を見てその内書く予定．
+
 
 
 
