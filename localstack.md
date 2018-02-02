@@ -47,6 +47,8 @@ suda@debian:~/localstack$
 ```
 
 以上でLocalStackのインストールと起動は終了しました．
+Webブラウザから，debianの8080番ポートにアクセスすると，簡単なダッシュボードが表示されるはずです．
+
 続いて，必要なコマンドをインストールします．
 具体的にはzipとawscliとjqです．
 
@@ -302,6 +304,19 @@ jq (1.5+dfsg-1.3) を設定しています ...
 suda@debian:~$
 ```
 
+### AWSプロファイルの設定
+
+インストールが終わったので，AWSプロファイルを設定します．
+
+```
+suda@debian:~$ aws configure --profile localstack
+AWS Access Key ID [None]: dummy
+AWS Secret Access Key [None]: dummy
+Default region name [None]: us-east-1
+Default output format [None]: text
+suda@debian:~$
+```
+
 ## 簡単なFunctionの作成
 
 簡単なLambda Functionを作成して，LocalStack上に登録してみましょう．
@@ -331,6 +346,39 @@ suda@debian:~/lambda$
 def lambda_handler(event, context):
     return 'Hello from Lambda'
 ```
+
+それでは，LocalStack上に登録してみましょう．
+ちょっとコマンドが長いですが，間違えずに入力してください．
+
+```
+suda@debian:~/lambda$ aws --endpoint-url=http://localhost:4574 --region us-east-1 --profile localstack lambda create-function --function-name="lambda_test" --runtime=python3.6 --role=r1 --handler=lambda.lambda_handler --zip-file fileb://lambda.zip
+arn:aws:lambda:us-east-1:000000000000:function:lambda_test	lambda_test	lambda.lambda_handler	r1	python3.6
+SECURITYGROUPIDS	None
+SUBNETIDS	None
+suda@debian:~/lambda$
+```
+
+Webブラウザで，先程のダッシュボードのページを確認してください．
+登録したLambda Functionが表示されているはずです．
+
+以下のようにして実行してみましょう．
+200と表示されるのは，HTTP Status Codeです．
+結果は，末尾に付けたファイル名のファイルに入っています．
+
+```
+suda@debian:~/lambda$ aws lambda --endpoint-url=http://localhost:4574 --profile localstack invoke --function-name lambda_test --payload '{"key1":"value1", "key2":"value2", "key3":"value3"}' result.log
+200
+suda@debian:~/lambda$
+```
+
+結果を確認してみましょう．
+
+```
+suda@debian:~/lambda$ cat result.log
+Hello from Lambdasuda@debian:~/lambda$
+suda@debian:~/lambda$
+```
+
 
 
 
