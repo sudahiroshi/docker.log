@@ -166,7 +166,7 @@ NAME      STATUS     ROLES     AGE       VERSION
 debian    Ready      master    3m        v1.9.3
 ```
 
-## ノードの追加（node2で実行する）
+## ノードの追加（node2で実行）
 
 続いて，Workerノードを追加する．
 workerノードとは，実際にサービスが実行されるホストである．
@@ -193,7 +193,7 @@ Run 'kubectl get nodes' on the master to see this node join the cluster.
 suda@node2:~$
 ```
 
-## 追加されたノードの確認
+## 追加されたノードの確認（debianで実行）
 
 ノードの確認コマンドを実行すると，node2が追加されているはずである．
 なお，STATUSが```NotReady```になっているのは，起動処理のためである．
@@ -213,6 +213,50 @@ suda@debian:~$ kubectl get nodes
 NAME      STATUS    ROLES     AGE       VERSION
 debian    Ready     master    47m       v1.9.3
 node2     Ready     <none>    38m       v1.9.3
+suda@debian:~$
+```
+
+## サービスのデプロイ（debianで実行）
+
+無事にクラスタができたので，簡単なサービスを起動してみる．
+手順としては，
+1. nginxの起動
+2. LoadBalancerを通じて外部に公開
+3. 外部からアクセスするためのIPアドレスの確認
+4. サービスの基本的な情報を表示
+
+なぜか，外部IPがpengingのまま・・・
+
+```
+suda@debian:~$ kubectl run nginx --image=nginx
+deployment "nginx" created
+suda@debian:~$ kubectl get pods
+NAME                   READY     STATUS    RESTARTS   AGE
+nginx-8586cf59-99wc7   1/1       Running   0          9s
+
+suda@debian:~$ kubectl expose deployment nginx --port 80 --type LoadBalancer
+service "nginx" exposed
+
+suda@debian:~$ kubectl get services
+NAME         TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+kubernetes   ClusterIP      10.96.0.1      <none>        443/TCP        1h
+nginx        LoadBalancer   10.108.215.1   <pending>     80:31136/TCP   10s
+
+suda@debian:~$ kubectl describe services nginx
+Name:                     nginx
+Namespace:                default
+Labels:                   run=nginx
+Annotations:              <none>
+Selector:                 run=nginx
+Type:                     LoadBalancer
+IP:                       10.108.215.1
+Port:                     <unset>  80/TCP
+TargetPort:               80/TCP
+NodePort:                 <unset>  31136/TCP
+Endpoints:                10.244.2.2:80
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
 suda@debian:~$
 ```
 
