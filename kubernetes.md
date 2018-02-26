@@ -126,6 +126,18 @@ suda@debian:~$ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 また，その下には「Workerノードを追加する際に以下を実行せよ」と書かれた行が表示されるので，この行をなくさないように注意すること．
 
+ここで，Flannelを使用するために以下を実行しよう．
+
+```
+suda@debian:~$ kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/v0.9.1/Documentation/kube-flannel.yml
+clusterrole "flannel" created
+clusterrolebinding "flannel" created
+serviceaccount "flannel" created
+configmap "kube-flannel-cfg" created
+daemonset "kube-flannel-ds" created
+suda@debian:~$
+```
+
 ### Podネットワークのインストール（debianで実行）
 
 Pod間の通信手段をセットアップする．
@@ -215,6 +227,17 @@ debian    Ready     master    47m       v1.9.3
 node2     Ready     <none>    38m       v1.9.3
 suda@debian:~$
 ```
+
+もう少し詳しい情報を知りたい場合は，```-o wide```オプションを利用すると良い．
+
+```
+suda@debian:~$ kubectl get nodes -o wide
+NAME      STATUS    ROLES     AGE       VERSION   EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION   CONTAINER-RUNTIME
+debian    Ready     master    30m       v1.9.3    <none>        Debian GNU/Linux 9 (stretch)   4.9.0-4-amd64    docker://17.12.0-ce
+node2     Ready     <none>    28m       v1.9.3    <none>        Debian GNU/Linux 9 (stretch)   4.9.0-4-amd64    docker://17.12.0-ce
+suda@debian:~$
+```
+
 
 ## サービスのデプロイ（debianで実行）
 
