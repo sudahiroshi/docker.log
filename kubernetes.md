@@ -12,6 +12,7 @@ kubernetes.log
 [Installing kubeadm](https://kubernetes.io/docs/setup/independent/install-kubeadm/)
 
 順番にログを紹介する．まずは```apt-gransport-https```のインストール．
+
 ```
 suda@kube01:~$ sudo apt-get update && sudo apt-get install -y apt-transport-https
 無視:1 http://ftp.jp.debian.org/debian stretch InRelease
@@ -29,6 +30,7 @@ suda@kube01:~$
 ```
 
 続いて，Kubernetes関連のツールを公開しているGoogleの公開鍵の入手と登録．
+
 ```
 suda@kube01:~$ curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
 OK
