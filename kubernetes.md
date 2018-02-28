@@ -442,6 +442,62 @@ Events:                   <none>
 suda@debian:~$
 ```
 
+## Kubernetes Dashboardを動かしてみる
+
+```
+suda@kube01:~$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/src/deploy/recommended/kubernetes-dashboard.yaml
+secret "kubernetes-dashboard-certs" created
+serviceaccount "kubernetes-dashboard" created
+role "kubernetes-dashboard-minimal" created
+rolebinding "kubernetes-dashboard-minimal" created
+deployment "kubernetes-dashboard" created
+service "kubernetes-dashboard" created
+suda@kube01:~$
+```
+
+```
+suda@kube01:~$ kubectl get pods --all-namespaces
+NAMESPACE     NAME                                    READY     STATUS    RESTARTS   AGE
+default       nginx-8586cf59-lk7vt                    1/1       Running   0          3h
+kube-system   etcd-kube01                             1/1       Running   0          3h
+kube-system   kube-apiserver-kube01                   1/1       Running   0          3h
+kube-system   kube-controller-manager-kube01          1/1       Running   0          3h
+kube-system   kube-dns-6f4fd4bdf-ck2kl                3/3       Running   0          3h
+kube-system   kube-flannel-ds-jq7r7                   1/1       Running   0          3h
+kube-system   kube-proxy-vtgcj                        1/1       Running   0          3h
+kube-system   kube-scheduler-kube01                   1/1       Running   0          3h
+kube-system   kubernetes-dashboard-5bd6f767c7-2r7t8   1/1       Running   0          2m
+suda@kube01:~$
+```
+
+```
+suda@kube01:~$ kubectl describe service kubernetes-dashboard -n kube-system
+Name:              kubernetes-dashboard
+Namespace:         kube-system
+Labels:            k8s-app=kubernetes-dashboard
+Annotations:       kubectl.kubernetes.io/last-applied-configuration={"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"labels":{"k8s-app":"kubernetes-dashboard"},"name":"kubernetes-dashboard","namespace":...
+Selector:          k8s-app=kubernetes-dashboard
+Type:              ClusterIP
+IP:                10.98.70.55
+Port:              <unset>  443/TCP
+TargetPort:        8443/TCP
+Endpoints:         10.244.0.4:8443
+Session Affinity:  None
+Events:            <none>
+suda@kube01:~$
+```
+
+```
+suda@kube01:~$ kubectl proxy --address="0.0.0.0" -p 8001 --accept-hosts='^*$'
+Starting to serve on [::]:8001
+```
+
+この状態であれば，他のホストから```http://<debianのIPアドレス>:8001/```にアクセスできる．
+実際に使う場合位は```http://<debianのIPアドレス>:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/#!/login```にアクセスする．
+この辺りのことは下記URlを参照すること．
+
+[【IBM Cloud k8s】WebUI (Dashboard)への認証方法のメモ](https://qiita.com/MahoTakara/items/fc2e3758d0418001b0a2)
+
 ## 参考文献
 [自宅PCクラスタのKubernetesを1.9にバージョンアップしたログ](http://dr-asa.hatenablog.com/entry/2017/12/19/095008)
 [Get Docker CE for Ubuntu](https://docs.docker.com/engine/installation/linux/docker-ce/ubuntu/)
