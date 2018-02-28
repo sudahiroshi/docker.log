@@ -378,21 +378,52 @@ suda@debian:~$
 
 なぜか，外部IPがpengingのまま・・・
 
+まずはnginxを動かしてみる．
+
 ```
 suda@debian:~$ kubectl run nginx --image=nginx
 deployment "nginx" created
+suda@debian:~$
+```
+
+これまで起動を確認する．
+Kubernetesでは，PODという単位で動いているコンテナを確認できる．
+
+```
 suda@debian:~$ kubectl get pods
 NAME                   READY     STATUS    RESTARTS   AGE
 nginx-8586cf59-99wc7   1/1       Running   0          9s
 
+suda@debian:~$
+```
+
+LoadBalancerを起動する．
+これによって，外部からのアクセスが可能になる．
+ただし，ここで言う外部は「コンテナの外部」であり，debianから内部のIPアドレスを通じてアクセスできる世界である．
+
+```
 suda@debian:~$ kubectl expose deployment nginx --port 80 --type LoadBalancer
 service "nginx" exposed
+suda@debian:~$
+```
 
+起動したLoadBalancerのサービスを確認すると，コンテナ内に80番ポートで待ち受けをしているが，コンテナ外からは31136番ポートであることが分かる番ポートであることが分かる．
+よって，この例では```http://<debianのIPアドレス>:31136/```でアクセス可能である．
+参考までに，GoogleやAmazonのクラウド上では，下記のEXTERNAL-IPのところにきちんとIPアドレスが割り当てられ，独立したサービスとして起動する．
+
+```
 suda@debian:~$ kubectl get services
 NAME         TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
 kubernetes   ClusterIP      10.96.0.1      <none>        443/TCP        1h
 nginx        LoadBalancer   10.108.215.1   <pending>     80:31136/TCP   10s
 
+suda@debian:~$
+```
+
+ついでなので，nginxのサービスの詳細を表示してみる．
+ここでNodePortという項目が外部ポートである．
+
+```
 suda@debian:~$ kubectl describe services nginx
 Name:                     nginx
 Namespace:                default
