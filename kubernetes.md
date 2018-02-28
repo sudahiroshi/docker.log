@@ -11,6 +11,135 @@ kubernetes.log
 実際に行うのは実際に行うのは，```Installing kubeadm, kubelet and kubectl```の部分だけで良い．
 [Installing kubeadm](https://kubernetes.io/docs/setup/independent/install-kubeadm/)
 
+順番にログを紹介する．まずは```apt-gransport-https```のインストール．
+```
+suda@kube01:~$ sudo apt-get update && sudo apt-get install -y apt-transport-https
+無視:1 http://ftp.jp.debian.org/debian stretch InRelease
+ヒット:2 https://download.docker.com/linux/debian stretch InRelease
+ヒット:3 http://ftp.jp.debian.org/debian stretch-updates InRelease
+ヒット:4 http://ftp.jp.debian.org/debian stretch Release
+ヒット:6 http://security.debian.org/debian-security stretch/updates InRelease
+パッケージリストを読み込んでいます... 完了
+パッケージリストを読み込んでいます... 完了
+依存関係ツリーを作成しています
+状態情報を読み取っています... 完了
+apt-transport-https はすでに最新バージョン (1.4.8) です。
+アップグレード: 0 個、新規インストール: 0 個、削除: 0 個、保留: 2 個。
+suda@kube01:~$
+```
+
+続いて，Kubernetes関連のツールを公開しているGoogleの公開鍵の入手と登録．
+```
+suda@kube01:~$ curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+OK
+suda@kube01:~$
+```
+
+パッケージリポジトリにKubernetes関連のソースを追加（最後の2行）
+
+```
+suda@kube01:~$ sudo vi /etc/apt/sources.list
+```
+
+実際に編集したsources.listを示します．
+
+```
+#
+
+# deb cdrom:[Debian GNU/Linux 9.3.0 _Stretch_ - Official amd64 NETINST 20171209-12:10]/ stretch main
+
+# deb cdrom:[Debian GNU/Linux 9.3.0 _Stretch_ - Official amd64 NETINST 20171209-12:10]/ stretch main
+
+deb http://ftp.jp.debian.org/debian/ stretch main
+deb-src http://ftp.jp.debian.org/debian/ stretch main
+
+deb http://security.debian.org/debian-security stretch/updates main
+deb-src http://security.debian.org/debian-security stretch/updates main
+
+# stretch-updates, previously known as 'volatile'
+deb http://ftp.jp.debian.org/debian/ stretch-updates main
+deb [arch=amd64] https://download.docker.com/linux/debian stretch stable
+# deb-src [arch=amd64] https://download.docker.com/linux/debian stretch stable
+deb-src http://ftp.jp.debian.org/debian/ stretch-updates main
+
+# Kubernetes
+deb http://apt.kubernetes.io/ kubernetes-xenial main
+```
+
+パッケージ情報の更新を行います．
+
+```
+suda@kube01:~$ sudo apt-get update
+無視:1 http://ftp.jp.debian.org/debian stretch InRelease
+ヒット:2 http://ftp.jp.debian.org/debian stretch-updates InRelease
+ヒット:3 http://ftp.jp.debian.org/debian stretch Release
+ヒット:5 http://security.debian.org/debian-security stretch/updates InRelease
+ヒット:7 https://download.docker.com/linux/debian stretch InRelease
+取得:6 https://packages.cloud.google.com/apt kubernetes-xenial InRelease [8,987 B]
+取得:8 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 Packages [13.2 kB]
+22.2 kB を 0秒 で取得しました (22.6 kB/s)
+パッケージリストを読み込んでいます... 完了
+suda@kube01:~$
+```
+
+必要とするパッケージ```kubelet```，```kubeadm```，```kubectl```をインストールします．
+
+```
+suda@kube01:~$ sudo apt-get install -y kubelet kubeadm kubectl
+パッケージリストを読み込んでいます... 完了
+依存関係ツリーを作成しています
+状態情報を読み取っています... 完了
+以下の追加パッケージがインストールされます:
+  ebtables ethtool kubernetes-cni socat
+以下のパッケージが新たにインストールされます:
+  ebtables ethtool kubeadm kubectl kubelet kubernetes-cni socat
+アップグレード: 0 個、新規インストール: 7 個、削除: 0 個、保留: 2 個。
+57.5 MB のアーカイブを取得する必要があります。
+この操作後に追加で 414 MB のディスク容量が消費されます。
+取得:1 http://ftp.jp.debian.org/debian stretch/main amd64 ebtables amd64 2.0.10.4-3.5+b1 [85.5 kB]
+取得:2 http://ftp.jp.debian.org/debian stretch/main amd64 ethtool amd64 1:4.8-1+b1 [113 kB]
+取得:3 http://ftp.jp.debian.org/debian stretch/main amd64 socat amd64 1.7.3.1-2+deb9u1 [353 kB]
+取得:4 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubernetes-cni amd64 0.6.0-00 [5,910 kB]
+取得:5 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubelet amd64 1.9.3-00 [20.5 MB]
+取得:6 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubectl amd64 1.9.3-00 [10.5 MB]
+取得:7 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubeadm amd64 1.9.3-00 [20.1 MB]
+57.5 MB を 5秒 で取得しました (11.5 MB/s)
+以前に未選択のパッケージ ebtables を選択しています。
+(データベースを読み込んでいます ... 現在 49520 個のファイルとディレクトリがインストールされています。)
+.../0-ebtables_2.0.10.4-3.5+b1_amd64.deb を展開する準備をしています ...
+ebtables (2.0.10.4-3.5+b1) を展開しています...
+以前に未選択のパッケージ ethtool を選択しています。
+.../1-ethtool_1%3a4.8-1+b1_amd64.deb を展開する準備をしています ...
+ethtool (1:4.8-1+b1) を展開しています...
+以前に未選択のパッケージ kubernetes-cni を選択しています。
+.../2-kubernetes-cni_0.6.0-00_amd64.deb を展開する準備をしています ...
+kubernetes-cni (0.6.0-00) を展開しています...
+以前に未選択のパッケージ socat を選択しています。
+.../3-socat_1.7.3.1-2+deb9u1_amd64.deb を展開する準備をしています ...
+socat (1.7.3.1-2+deb9u1) を展開しています...
+以前に未選択のパッケージ kubelet を選択しています。
+.../4-kubelet_1.9.3-00_amd64.deb を展開する準備をしています ...
+kubelet (1.9.3-00) を展開しています...
+以前に未選択のパッケージ kubectl を選択しています。
+.../5-kubectl_1.9.3-00_amd64.deb を展開する準備をしています ...
+kubectl (1.9.3-00) を展開しています...
+以前に未選択のパッケージ kubeadm を選択しています。
+.../6-kubeadm_1.9.3-00_amd64.deb を展開する準備をしています ...
+kubeadm (1.9.3-00) を展開しています...
+kubernetes-cni (0.6.0-00) を設定しています ...
+socat (1.7.3.1-2+deb9u1) を設定しています ...
+systemd (232-25+deb9u1) のトリガを処理しています ...
+ebtables (2.0.10.4-3.5+b1) を設定しています ...
+Created symlink /etc/systemd/system/multi-user.target.wants/ebtables.service → /lib/systemd/system/ebtables.service.
+update-rc.d: warning: start and stop actions are no longer supported; falling back to defaults
+kubectl (1.9.3-00) を設定しています ...
+ethtool (1:4.8-1+b1) を設定しています ...
+kubelet (1.9.3-00) を設定しています ...
+Created symlink /etc/systemd/system/multi-user.target.wants/kubelet.service → /lib/systemd/system/kubelet.service.
+kubeadm (1.9.3-00) を設定しています ...
+systemd (232-25+deb9u1) のトリガを処理しています ...
+suda@kube01:~$
+```
 ## Kubernetesクラスタの作成
 
 ここから先はこちらを参考にして，順番に環境を整えていく．
