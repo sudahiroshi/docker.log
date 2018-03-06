@@ -535,6 +535,50 @@ nginx        LoadBalancer   10.108.132.235   <pending>     80:31375/TCP   37m
 suda@debian:~$
 ```
 
+### ホスト名ベースのロードバランサを設定する
+
+このままでは，複数のWebサービスを起動しても競合してしまうので，ディレクトリ名ベースかホスト名ベースでサービスへのエントリーを分ける必要がある．
+ここでは，ホスト名ベースでサービスを分けるやり方を記述する．
+参考ページは，先程も示したKubernetesのIngressのページである．
+[Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
+
+まずは，設定ファイル```ingress.yaml```を以下のように編集する．
+ここで，```host```の項目に付けた名称毎にサービスを分けることができる．
+ここでは，```nip.io```のサービスを利用しているが，本来はDNSの設定でCNAMEを記載するのが普通である．
+
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: test-ingress
+spec:
+  rules:
+  - host: web.172.16.121.165.nip.io
+    http:
+      paths:
+      - backend:
+          serviceName: nginx
+          servicePort: 80
+  - host: dashboard.172.16.121.165.nip.io
+    http:
+      paths:
+      - backend:
+          serviceName: kubernetes-dashboard
+          servicePort: 8001
+```
+
+次に，以下のようにIngressの設定ファイルをリロードし，情報を表示させてみよう．
+
+```
+suda@debian:~$ kubectl replace -f ingress.yaml
+ingress "test-ingress" replaced
+
+suda@debian:~$ kubectl get ingress
+NAME           HOSTS                                                       ADDRESS   PORTS     AGE
+test-ingress   web.172.16.121.165.nip.io,dashboard.172.16.121.165.nip.io             80        4h
+suda@debian:~$
+```
+
 ## Kubernetes Dashboardを動かしてみる
 
 ```
