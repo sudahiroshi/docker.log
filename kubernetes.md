@@ -442,6 +442,97 @@ Events:                   <none>
 suda@debian:~$
 ```
 
+## Ingressを使って，外部にサービスを公開する
+
+前節のままでは，サービスは起動しているが，外部からアクセスできない状態である．
+外部からサービスにアクセスするための仕組みが必要であり，KubernetesではIngressと呼ばれている．
+Ingressは仕組みの名称であり，実体にはLoadBalancerやNginxによるリバースProxyである．
+ここでは，Nghttpxを使用する．
+
+インストール手順は下記に書いてある・・・はずであるが，正常に動作しなかった．
+[nghttpx-ingress-lb](https://github.com/zlabjp/nghttpx-ingress-lb)
+
+そこで，こちらのページの内容を使って起動する．
+[月10ドルで海外VPSでKubernetesを試してみる（kubernetes v1.9版）](http://inajob.hatenablog.jp/entry/2018/02/28/%E6%9C%8810%E3%83%89%E3%83%AB%E3%81%A7%E6%B5%B7%E5%A4%96VPS%E3%81%A7Kubernetes%E3%82%92%E8%A9%A6%E3%81%97%E3%81%A6%E3%81%BF%E3%82%8B%EF%BC%88kubernetes_v1.9%E7%89%88%EF%BC%89)
+
+Masterやworkerのセットアップなどはすでに済んでいるので，ページの半分より少し下の「ingress-controllerのデプロイ」以下を実行する．
+まずはファイルのダウンロードから行う．（この手順は，ページの上の方で済ませていることが前提となっているので，ここで実行する）
+
+```
+suda@debian:~$ git clone https://github.com/inajob/my-vps-kubernetes.git
+Cloning into 'my-vps-kubernetes'...
+remote: Counting objects: 36, done.
+remote: Compressing objects: 100% (27/27), done.
+remote: Total 36 (delta 6), reused 27 (delta 4), pack-reused 0
+Unpacking objects: 100% (36/36), done.
+
+suda@debian:~$ ls -F
+my-vps-kubernetes/
+
+suda@debian:~$ cd my-vps-kubernetes/
+
+suda@debian:~/my-vps-kubernetes$ ls -F
+init-scripts  kubeproxy.bat  manifests/
+suda@debian:~/my-vps-kubernetes$
+```
+
+それではIngress Controllerを起動する．
+
+```
+suda@debian:~/my-vps-kubernetes$ kubectl apply -f manifests/ingress-controller/
+deployment "default-http-backend" created
+service "default-http-backend" created
+Warning: kubectl apply should be used on resource created by either kubectl create --save-config or kubectl apply
+serviceaccount "ingress" configured
+clusterrole "ingress-clusterrole" created
+role "ingress-role" created
+rolebinding "ingress-role-binding" created
+clusterrolebinding "ingress-clusterrole-binding" created
+deployment "nghttpx-ingress-controller" created
+service "nginhttpx-health" created
+suda@debian:~/my-vps-kubernetes$
+```
+
+続いて，すでに起動しているnginxのサービスを，外部に公開するための設定ファイルを記述する．
+ファイル名は，```ingress.yaml```としておく．
+
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: test-ingress
+spec:
+  backend:
+    serviceName: testsvc
+    servicePort: 80
+```
+
+上記設定ファイルを元にして，Ingressを起動する．
+続く行はIngressの設定の確認である．
+確かに，```test-ingress```という名称で，80番ポートを使用することが分かる．
+
+```
+suda@debian:~$ kubectl create -f ingress.yaml
+ingress "test-ingress" created
+
+suda@debian:~$ kubectl get ingress
+NAME           HOSTS     ADDRESS   PORTS     AGE
+test-ingress   *                   80        5s
+suda@debian:~$
+```
+
+この状態で，```http://<debianのIPアドレス>/```にアクセスすると，無事にNginxのページを閲覧可能である．
+ここまで来たら，Kubernetesの各種情報が更新されても良さそうであるが，残念ながらそこまではやってくれないらしい．
+サービス一覧を表示させても，```EXTERNAL-IP```は```pending```のままであった．
+
+```
+suda@debian:~$ kubectl get services
+NAME         TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+kubernetes   ClusterIP      10.96.0.1        <none>        443/TCP        20h
+nginx        LoadBalancer   10.108.132.235   <pending>     80:31375/TCP   37m
+suda@debian:~$
+```
+
 ## Kubernetes Dashboardを動かしてみる
 
 ```
