@@ -495,6 +495,8 @@ suda@debian:~/my-vps-kubernetes$
 
 続いて，すでに起動しているnginxのサービスを，外部に公開するための設定ファイルを記述する．
 ファイル名は，```ingress.yaml```としておく．
+このファイルの内容は，下記サイトを参考にしてサービス名を変更したものである．
+[Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
 
 ```
 apiVersion: extensions/v1beta1
@@ -503,7 +505,7 @@ metadata:
   name: test-ingress
 spec:
   backend:
-    serviceName: testsvc
+    serviceName: nginx
     servicePort: 80
 ```
 
