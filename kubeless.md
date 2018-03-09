@@ -1,9 +1,9 @@
-kubernetes.log
+kubeless.log
 ===============
 
-これまで構築してきたdebianを2つ使う．
-2個めとして，再度debianをインストールしても良いし，環境が許せば仮想計算機のイメージを複製しても良い．
-ここでは，2台めのホスト名をnode2として話を進める．
+Kubernetesを拡張して，FaaS(Function as a Service)の構築方法についてまとめる．
+これまで構築してきたKubernetes環境とは，若干異なるセットアップになるが，将来的には統合する予定である．
+そのため，共通部分はそのまま残してある．
 
 ## kubeadmなどの関連コマンドのインストール
 
@@ -189,17 +189,20 @@ Masterノードとは，クラスタ全体の管理を行うノードである�
 なお，Podネットワークが必要になるが，ここではFlannelを採用する．
 そのため，init時にネットワークの設定を追加する必要があるので注意すること．
 
+以下にセットアップのログを示す．
+なお，debianのIPアドレスは172.16.121.165であるものとする．
+
+
 ```
-suda@debian:~$ sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+suda@kube01:~$ sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=172.16.121.165
 [init] Using Kubernetes version: v1.9.3
 [init] Using Authorization modes: [Node RBAC]
 [preflight] Running pre-flight checks.
-	[WARNING SystemVerification]: docker version is greater than the most recently validated version. Docker version: 17.12.0-ce. Max validated version: 17.03
 	[WARNING FileExisting-crictl]: crictl not found in system path
 [preflight] Starting the kubelet service
 [certificates] Generated ca certificate and key.
 [certificates] Generated apiserver certificate and key.
-[certificates] apiserver serving cert is signed for DNS names [debian kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [10.96.0.1 172.16.121.160]
+[certificates] apiserver serving cert is signed for DNS names [kube01 kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [10.96.0.1 172.16.121.165]
 [certificates] Generated apiserver-kubelet-client certificate and key.
 [certificates] Generated sa key and public key.
 [certificates] Generated front-proxy-ca certificate and key.
@@ -215,11 +218,11 @@ suda@debian:~$ sudo kubeadm init --pod-network-cidr=10.244.0.0/16
 [etcd] Wrote Static Pod manifest for a local etcd instance to "/etc/kubernetes/manifests/etcd.yaml"
 [init] Waiting for the kubelet to boot up the control plane as Static Pods from directory "/etc/kubernetes/manifests".
 [init] This might take a minute or longer if the control plane images have to be pulled.
-[apiclient] All control plane components are healthy after 27.501359 seconds
+[apiclient] All control plane components are healthy after 28.001277 seconds
 [uploadconfig] Storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
-[markmaster] Will mark node debian as master by adding a label and a taint
-[markmaster] Master debian tainted and labelled with key/value: node-role.kubernetes.io/master=""
-[bootstraptoken] Using token: ac622a.4225187698b87e71
+[markmaster] Will mark node kube01 as master by adding a label and a taint
+[markmaster] Master kube01 tainted and labelled with key/value: node-role.kubernetes.io/master=""
+[bootstraptoken] Using token: 311f64.7b54b4ce759d066f
 [bootstraptoken] Configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
 [bootstraptoken] Configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
 [bootstraptoken] Configured RBAC rules to allow certificate rotation for all node client certificates in the cluster
@@ -242,9 +245,9 @@ Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
 You can now join any number of machines by running the following on each node
 as root:
 
-  kubeadm join --token ac622a.4225187698b87e71 172.16.121.160:6443 --discovery-token-ca-cert-hash sha256:572be0ef181ba23d987edf03501b00037ee97aa4c23c3a2603a8914f86023e04
+  kubeadm join --token 311f64.7b54b4ce759d066f 172.16.121.165:6443 --discovery-token-ca-cert-hash sha256:e7bc7d595c244518086b932196df6653bd4622493e89eee33f9baf1ac3ea2c51
 
-suda@debian:~$
+suda@kube01:~$
 ```
 
 なお，実行結果の最後の方で，「一般ユーザで以下を実行する必要がある」と書かれている行を，忘れずに実行すること．
@@ -284,6 +287,7 @@ suda@debian:~$ kubectl taint nodes --all node-role.kubernetes.io/master-
 ### 確認
 
 Kubernetesクラスタ上で起動しているすべてのサービスを表示する例を以下に示す．
+STATUS欄がRunningとなっているのは起動完了しているコンテナであり，Penginとなっているのはこれから起動するコンテナである．
 
 ```
 suda@debian:~$ kubectl get pods --all-namespaces
@@ -366,8 +370,418 @@ node2     Ready     <none>    28m       v1.9.3    <none>        Debian GNU/Linux
 suda@debian:~$
 ```
 
+## Helmのインストール
 
-## サービスのデプロイ（debianで実行）
+ここから先は以下のページを参考にインストールを進める．
+[Kubeless on Packet Cloud](https://medium.com/bitnami-perspectives/kubeless-on-packet-cloud-9e5605b8bb97)
+
+Helmとは，Kubernetesのパッケージマネージャである．
+今回は，Helmを使ってIngress Controllerをインストールする．
+手順を一纏めにして以下に示す．
+
+1. 環境変数```HELM_RELEASE```に最新版のバージョンを代入する
+2. helmコマンドの入ったtar.gzファイルをダウンロードする
+3. tarコマンドで展開する
+4. chmodで実行権限を付ける
+5. helmコマンドを```/usr/local/bin```に移動する
+
+```
+suda@kube01:~$ HELM_RELEASE=v2.8.1
+
+suda@kube01:~$ wget -c https://storage.googleapis.com/kubernetes-helm/helm-${HELM_RELEASE}-linux-amd64.tar.gz
+--2018-03-08 14:42:46--  https://storage.googleapis.com/kubernetes-helm/helm-v2.8.1-linux-amd64.tar.gz
+storage.googleapis.com (storage.googleapis.com) をDNSに問いあわせています... 172.217.31.144, 2404:6800:4004:808::2010
+storage.googleapis.com (storage.googleapis.com)|172.217.31.144|:443 に接続しています... 接続しました。
+HTTP による接続要求を送信しました、応答を待っています... 200 OK
+長さ: 14953924 (14M) [application/x-tar]
+`helm-v2.8.1-linux-amd64.tar.gz' に保存中
+
+helm-v2.8.1-linux-amd64.tar.gz                       100%[======================================================================================================================>]  14.26M  19.4MB/s    in 0.7s
+
+2018-03-08 14:42:47 (19.4 MB/s) - `helm-v2.8.1-linux-amd64.tar.gz' へ保存完了 [14953924/14953924]
+
+suda@kube01:~$ tar zxf helm-${HELM_RELEASE}-linux-amd64.tar.gz --strip 1 linux-amd64/helm
+
+suda@kube01:~$ chmod +x helm
+
+suda@kube01:~$ sudo mv helm /usr/local/bin/helm
+suda@kube01:~$
+```
+
+続いて，RBAC(Role-Based Access Control)を有効にする．
+まずは，ServiceAccountとしてtillerを登録するためのYAMLファイルを作成する．
+ファイル名はrbac-config.yamlとする．
+
+```
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tiller
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: tiller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: tiller
+    namespace: kube-system
+```
+
+続いて，Kubernetesに登録する．
+
+```
+suda@kube01:~$ kubectl create -f rbac-config.yaml
+serviceaccount "tiller" created
+clusterrolebinding "tiller" created
+suda@kube01:~$
+```
+
+作成したSErviceAccountを使ってHelmの初期化を行う．
+
+```
+suda@kube01:~$ helm init --service-account tiller
+Creating /home/suda/.helm
+Creating /home/suda/.helm/repository
+Creating /home/suda/.helm/repository/cache
+Creating /home/suda/.helm/repository/local
+Creating /home/suda/.helm/plugins
+Creating /home/suda/.helm/starters
+Creating /home/suda/.helm/cache/archive
+Creating /home/suda/.helm/repository/repositories.yaml
+Adding stable repo with URL: https://kubernetes-charts.storage.googleapis.com
+Adding local repo with URL: http://127.0.0.1:8879/charts
+$HELM_HOME has been configured at /home/suda/.helm.
+
+Tiller (the Helm server-side component) has been installed into your Kubernetes Cluster.
+Happy Helming!
+suda@kube01:~$
+```
+
+以上でHelmが利用可能になったので，次にnginx-ingressをインストールする．
+
+```
+suda@kube01:~$ helm install --name nginx-ingress stable/nginx-ingress --set rbac.create=true,controller.service.type=NodePort,controller.service.nodePorts.http=30080
+NAME:   nginx-ingress
+LAST DEPLOYED: Thu Mar  8 14:44:10 2018
+NAMESPACE: default
+STATUS: DEPLOYED
+
+RESOURCES:
+==> v1/ConfigMap
+NAME                      DATA  AGE
+nginx-ingress-controller  1     1s
+
+==> v1beta1/ClusterRoleBinding
+NAME           AGE
+nginx-ingress  1s
+
+==> v1beta1/Role
+NAME           AGE
+nginx-ingress  1s
+
+==> v1beta1/RoleBinding
+NAME           AGE
+nginx-ingress  1s
+
+==> v1/Service
+NAME                           TYPE       CLUSTER-IP      EXTERNAL-IP  PORT(S)                     AGE
+nginx-ingress-controller       NodePort   10.105.152.127  <none>       80:30080/TCP,443:30935/TCP  1s
+nginx-ingress-default-backend  ClusterIP  10.96.18.249    <none>       80/TCP                      1s
+
+==> v1/ServiceAccount
+NAME           SECRETS  AGE
+nginx-ingress  1        1s
+
+==> v1beta1/ClusterRole
+NAME           AGE
+nginx-ingress  1s
+
+==> v1beta1/Deployment
+NAME                           DESIRED  CURRENT  UP-TO-DATE  AVAILABLE  AGE
+nginx-ingress-controller       1        1        1           0          1s
+nginx-ingress-default-backend  1        1        1           0          1s
+
+==> v1beta1/PodDisruptionBudget
+NAME                           MIN AVAILABLE  MAX UNAVAILABLE  ALLOWED DISRUPTIONS  AGE
+nginx-ingress-controller       1              N/A              0                    1s
+nginx-ingress-default-backend  1              N/A              0                    0s
+
+==> v1/Pod(related)
+NAME                                            READY  STATUS             RESTARTS  AGE
+nginx-ingress-controller-7bf445fd-wdzgq         0/1    ContainerCreating  0         0s
+nginx-ingress-default-backend-6664bc64c9-2cgfv  0/1    ContainerCreating  0         0s
+
+
+NOTES:
+The nginx-ingress controller has been installed.
+Get the application URL by running these commands:
+  export HTTP_NODE_PORT=30080
+  export HTTPS_NODE_PORT=$(kubectl --namespace default get services -o jsonpath="{.spec.ports[1].nodePort}" nginx-ingress-controller)
+  export NODE_IP=$(kubectl --namespace default get nodes -o jsonpath="{.items[0].status.addresses[1].address}")
+
+  echo "Visit http://$NODE_IP:$HTTP_NODE_PORT to access your application via HTTP."
+  echo "Visit https://$NODE_IP:$HTTPS_NODE_PORT to access your application via HTTPS."
+
+An example Ingress that makes use of the controller:
+
+  apiVersion: extensions/v1beta1
+  kind: Ingress
+  metadata:
+    annotations:
+      kubernetes.io/ingress.class: nginx
+    name: example
+    namespace: foo
+  spec:
+    rules:
+      - host: www.example.com
+        http:
+          paths:
+            - backend:
+                serviceName: exampleService
+                servicePort: 80
+              path: /
+    # This section is only required if TLS is to be enabled for the Ingress
+    tls:
+        - hosts:
+            - www.example.com
+          secretName: example-tls
+
+If TLS is enabled for the Ingress, a Secret containing the certificate and key must also be provided:
+
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    name: example-tls
+    namespace: foo
+  data:
+    tls.crt: <base64 encoded cert>
+    tls.key: <base64 encoded key>
+  type: kubernetes.io/tls
+
+suda@kube01:~$
+```
+
+## Kubelessのインストール
+
+### Kubeless環境のインストール
+
+Ingress Contollerをインストールしたので，続いてKubeless環境をインストールする．
+順番に，以下のことを行っていく．
+1. ```RELEASE```に最新版のバージョンを代入する
+2. Kubernetesに```kubeless```というNamespaceを登録する
+3. YAMLファイルをダウンロードする
+4. YAMLファイルを基に，Kubelessを起動する
+
+```
+suda@kube01:~$ export RELEASE=v0.4.0
+
+suda@kube01:~$ kubectl create namespace kubeless
+
+namespace "kubeless" created
+suda@kube01:~$ curl -LO https://github.com/kubeless/kubeless/releases/download/${RELEASE}/kubeless-rbac-${RELEASE}.yaml
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   615    0   615    0     0    799      0 --:--:-- --:--:-- --:--:--   800
+100  9525  100  9525    0     0   5923      0  0:00:01  0:00:01 --:--:-- 11773
+
+suda@kube01:~$ kubectl create -f kubeless-rbac-${RELEASE}.yaml
+service "zoo" created
+deployment "kubeless-controller" created
+clusterrolebinding "kubeless-controller-deployer" created
+customresourcedefinition "functions.kubeless.io" created
+service "broker" created
+service "kafka" created
+statefulset "zoo" created
+service "zookeeper" created
+configmap "kubeless-config" created
+serviceaccount "controller-acct" created
+clusterrole "kubeless-controller-deployer" created
+statefulset "kafka" created
+suda@kube01:~$
+```
+
+### kubelssコマンドのセットアップ
+
+順番が前後するが，```kubeless```コマンドのセットアップも行う．
+順番に以下のことを実行している．
+1. unzipパッケージのインストール
+2. kubelessコマンドの圧縮ファイルのダウンロード
+3. kubelessコマンドの展開
+4. 実行属性の付与
+5. ```/usr/loca/bin```に移動
+6. 動作確認のためにバージョンを表示させる
+
+```
+suda@kube01:~$ sudo apt-get install -y unzip
+パッケージリストを読み込んでいます... 完了
+依存関係ツリーを作成しています
+状態情報を読み取っています... 完了
+提案パッケージ:
+  zip
+以下のパッケージが新たにインストールされます:
+  unzip
+アップグレード: 0 個、新規インストール: 1 個、削除: 0 個、保留: 4 個。
+170 kB のアーカイブを取得する必要があります。
+この操作後に追加で 547 kB のディスク容量が消費されます。
+取得:1 http://ftp.jp.debian.org/debian stretch/main amd64 unzip amd64 6.0-21 [170 kB]
+170 kB を 0秒 で取得しました (543 kB/s)
+以前に未選択のパッケージ unzip を選択しています。
+(データベースを読み込んでいます ... 現在 51307 個のファイルとディレクトリがインストールされています。)
+.../unzip_6.0-21_amd64.deb を展開する準備をしています ...
+unzip (6.0-21) を展開しています...
+mime-support (3.60) のトリガを処理しています ...
+unzip (6.0-21) を設定しています ...
+
+suda@kube01:~$ wget -c https://github.com/kubeless/kubeless/releases/download/${RELEASE}/kubeless_linux-amd64.zip
+--2018-03-08 14:48:54--  https://github.com/kubeless/kubeless/releases/download/v0.4.0/kubeless_linux-amd64.zip
+github.com (github.com) をDNSに問いあわせています... 192.30.253.113, 192.30.253.112
+github.com (github.com)|192.30.253.113|:443 に接続しています... 接続しました。
+HTTP による接続要求を送信しました、応答を待っています... 302 Found
+場所: https://github-production-release-asset-2e65be.s3.amazonaws.com/73902337/c119333e-10be-11e8-93bf-cf0183e444d4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20180308%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20180308T054855Z&X-Amz-Expires=300&X-Amz-Signature=a660e31a8f9fa44b57e45b6124218318c711fed138586a16da23cecf7d3ba347&X-Amz-SignedHeaders=host&actor_id=0&response-content-disposition=attachment%3B%20filename%3Dkubeless_linux-amd64.zip&response-content-type=application%2Foctet-stream [続く]
+--2018-03-08 14:48:55--  https://github-production-release-asset-2e65be.s3.amazonaws.com/73902337/c119333e-10be-11e8-93bf-cf0183e444d4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20180308%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20180308T054855Z&X-Amz-Expires=300&X-Amz-Signature=a660e31a8f9fa44b57e45b6124218318c711fed138586a16da23cecf7d3ba347&X-Amz-SignedHeaders=host&actor_id=0&response-content-disposition=attachment%3B%20filename%3Dkubeless_linux-amd64.zip&response-content-type=application%2Foctet-stream
+github-production-release-asset-2e65be.s3.amazonaws.com (github-production-release-asset-2e65be.s3.amazonaws.com) をDNSに問いあわせています... 52.216.16.80
+github-production-release-asset-2e65be.s3.amazonaws.com (github-production-release-asset-2e65be.s3.amazonaws.com)|52.216.16.80|:443 に接続しています... 接続しました。
+HTTP による接続要求を送信しました、応答を待っています... 200 OK
+長さ: 6555227 (6.3M) [application/octet-stream]
+`kubeless_linux-amd64.zip' に保存中
+
+kubeless_linux-amd64.zip                             100%[======================================================================================================================>]   6.25M  1.82MB/s    in 4.5s
+
+2018-03-08 14:49:00 (1.38 MB/s) - `kubeless_linux-amd64.zip' へ保存完了 [6555227/6555227]
+
+suda@kube01:~$ unzip kubeless_linux-amd64.zip
+Archive:  kubeless_linux-amd64.zip
+   creating: bundles/kubeless_linux-amd64/
+  inflating: bundles/kubeless_linux-amd64/kubeless
+  
+suda@kube01:~$ chmod +x bundles/kubeless_linux-amd64/kubeless
+
+suda@kube01:~$ sudo mv bundles/kubeless_linux-amd64/kubeless /usr/local/bin/
+
+suda@kube01:~$ kubeless version
+Kubeless version: v0.4.0 (4f4f531f)
+suda@kube01:~$
+```
+
+### 確認
+
+ここまでの手順がきちんと動いていると，以下のように表示されるはずである．
+（```Kafka```と```zoo```の```STATUS```がInitになっているが，正常である）
+
+```
+suda@kube01:~$ kubectl get pods --namespace kubeless
+NAME                                  READY     STATUS     RESTARTS   AGE
+kafka-0                               0/1       Init:0/1   0          1m
+kubeless-controller-b54bc9db6-hkgnr   1/1       Running    0          1m
+zoo-0                                 0/1       Init:0/1   0          1m
+suda@kube01:~$
+```
+
+CRD(Custom Resource Definition)も確認してみる．
+以下のように表示されたら正常である．
+
+
+```
+suda@kube01:~$ kubectl get crd
+NAME                    AGE
+functions.kubeless.io   29s
+suda@kube01:~$
+```
+
+## Functionの登録
+
+参考サイトに従って，Pythonで書かれた```hello.py```というプログラムを，Function名```greeting```として登録してみる．
+
+### Functionの登録
+
+まずは以下の内容を持つ```hello.py```を作成する．
+
+```
+def greeting():
+    return "hello, world!"
+```
+
+続いて，```hello.py```をFunctionとして登録する．
+
+```
+suda@kube01:~/kubeless$ kubeless function deploy greeting --runtime python2.7 --from-file hello.py --handler hello.greeting --trigger-http
+INFO[0000] Deploying function...
+INFO[0000] Function greeting submitted for deployment
+INFO[0000] Check the deployment status executing 'kubeless function ls greeting'
+suda@kube01:~/kubeless$
+```
+
+以下のようにして確認する．
+
+```
+suda@kube01:~/kubeless$ kubeless function ls
+NAME    	NAMESPACE	HANDLER       	RUNTIME  	TYPE	TOPIC	DEPENDENCIES	STATUS
+greeting	default  	hello.greeting	python2.7	HTTP	     	            	0/1 NOT READY
+suda@kube01:~/kubeless$
+```
+
+Python2.7のコンテナを用意するために，若干時間が掛かる．
+準備ができると以下のようになる．
+
+```
+suda@kube01:~$ kubeless function ls
+NAME    	NAMESPACE	HANDLER       	RUNTIME  	TYPE	TOPIC	DEPENDENCIES	STATUS
+greeting	default  	hello.greeting	python2.7	HTTP	     	            	1/1 READY
+suda@kube01:~$
+```
+
+### Functionのテスト
+
+以下のようにすると，登録されたFunctionを実行できる．
+
+```
+suda@kube01:~/kubeless$ kubeless function call greeting
+hello, world!
+suda@kube01:~/kubeless$
+```
+
+### Ingressへの登録
+
+参考資料では，Ingressに登録するためにはkubelessコマンドのingressサブコマンドを使うと書いてあるが，バージョンアップに伴いサブコマンドが変更された．
+新しいサブコマンドは```route```である．
+実際に登録した例を示す．
+
+```
+suda@kube01:~/kubeless$ kubeless route create greeting --function greeting
+suda@kube01:~/kubeless$
+```
+
+確認は以下のとおりである．
+kubelessで登録したFunctionは，上記コマンドの```create```の後ろにつけた文字列を，Function利用時にホスト名の前に付けることになる．
+
+```
+suda@kube01:~/kubeless$ kubeless route ls
+NAME    	NAMESPACE	HOST                          	PATH	SERVICE NAME	SERVICE PORT
+greeting	default  	greeting.172.16.121.165.nip.io	/   	greeting    	8080
+
+suda@kube01:~/kubeless$ kubectl get ingress
+NAME       HOSTS                            ADDRESS   PORTS     AGE
+greeting   greeting.172.16.121.165.nip.io             80        1h
+suda@kube01:~/kubeless$
+```
+
+この状態であれば，curlコマンドやWebブラウザからアクセス可能である．
+以下にcurlコマンドを使ってアクセスした例を示す．
+HTTPヘッダに```Host```情報が必要な点と，ポート番号が30080になっていることに気をつけてほしい．
+なお，hello.pyでは表示時に改行が付けられていないので，プロンプトと一緒になっている．
+
+```
+suda@kube01:~/kubeless$ curl --header "Host: greeting.172.16.121.165.nip.io" 172.16.121.165:30080
+hello, world!suda@kube01:~/kubeless$
+```
+
+## 通常のサービスのデプロイ（debianで実行）
 
 無事にクラスタができたので，簡単なサービスを起動してみる．
 手順としては，
@@ -444,105 +858,12 @@ suda@debian:~$
 
 ## Ingressを使って，外部にサービスを公開する
 
-前節のままでは，サービスは起動しているが，外部からアクセスできない状態である．
-外部からサービスにアクセスするための仕組みが必要であり，KubernetesではIngressと呼ばれている．
-Ingressは仕組みの名称であり，実体にはLoadBalancerやNginxによるリバースProxyである．
-ここでは，Nghttpxを使用する．
-
-インストール手順は下記に書いてある・・・はずであるが，正常に動作しなかった．
-[nghttpx-ingress-lb](https://github.com/zlabjp/nghttpx-ingress-lb)
-
-そこで，こちらのページの内容を使って起動する．
-[月10ドルで海外VPSでKubernetesを試してみる（kubernetes v1.9版）](http://inajob.hatenablog.jp/entry/2018/02/28/%E6%9C%8810%E3%83%89%E3%83%AB%E3%81%A7%E6%B5%B7%E5%A4%96VPS%E3%81%A7Kubernetes%E3%82%92%E8%A9%A6%E3%81%97%E3%81%A6%E3%81%BF%E3%82%8B%EF%BC%88kubernetes_v1.9%E7%89%88%EF%BC%89)
-
-Masterやworkerのセットアップなどはすでに済んでいるので，ページの半分より少し下の「ingress-controllerのデプロイ」以下を実行する．
-まずはファイルのダウンロードから行う．（この手順は，ページの上の方で済ませていることが前提となっているので，ここで実行する）
-
-```
-suda@debian:~$ git clone https://github.com/inajob/my-vps-kubernetes.git
-Cloning into 'my-vps-kubernetes'...
-remote: Counting objects: 36, done.
-remote: Compressing objects: 100% (27/27), done.
-remote: Total 36 (delta 6), reused 27 (delta 4), pack-reused 0
-Unpacking objects: 100% (36/36), done.
-
-suda@debian:~$ ls -F
-my-vps-kubernetes/
-
-suda@debian:~$ cd my-vps-kubernetes/
-
-suda@debian:~/my-vps-kubernetes$ ls -F
-init-scripts  kubeproxy.bat  manifests/
-suda@debian:~/my-vps-kubernetes$
-```
-
-それではIngress Controllerを起動する．
-
-```
-suda@debian:~/my-vps-kubernetes$ kubectl apply -f manifests/ingress-controller/
-deployment "default-http-backend" created
-service "default-http-backend" created
-Warning: kubectl apply should be used on resource created by either kubectl create --save-config or kubectl apply
-serviceaccount "ingress" configured
-clusterrole "ingress-clusterrole" created
-role "ingress-role" created
-rolebinding "ingress-role-binding" created
-clusterrolebinding "ingress-clusterrole-binding" created
-deployment "nghttpx-ingress-controller" created
-service "nginhttpx-health" created
-suda@debian:~/my-vps-kubernetes$
-```
-
-続いて，すでに起動しているnginxのサービスを，外部に公開するための設定ファイルを記述する．
-ファイル名は，```ingress.yaml```としておく．
+このままでは外部からアクセス出来ないので，Ingressにサービスを登録する．
+手順としては，nginxのサービスを外部に公開するための設定ファイルを記述し，kubectlコマンドを使って登録する．
+公開する設定ファイル名は```ingress.yaml```としておく．
 このファイルの内容は，下記サイトを参考にしてサービス名を変更したものである．
 [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
 
-```
-apiVersion: extensions/v1beta1
-kind: Ingress
-metadata:
-  name: test-ingress
-spec:
-  backend:
-    serviceName: nginx
-    servicePort: 80
-```
-
-上記設定ファイルを元にして，Ingressを起動する．
-続く行はIngressの設定の確認である．
-確かに，```test-ingress```という名称で，80番ポートを使用することが分かる．
-
-```
-suda@debian:~$ kubectl create -f ingress.yaml
-ingress "test-ingress" created
-
-suda@debian:~$ kubectl get ingress
-NAME           HOSTS     ADDRESS   PORTS     AGE
-test-ingress   *                   80        5s
-suda@debian:~$
-```
-
-この状態で，```http://<debianのIPアドレス>/```にアクセスすると，無事にNginxのページを閲覧可能である．
-ここまで来たら，Kubernetesの各種情報が更新されても良さそうであるが，残念ながらそこまではやってくれないらしい．
-サービス一覧を表示させても，```EXTERNAL-IP```は```pending```のままであった．
-
-```
-suda@debian:~$ kubectl get services
-NAME         TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
-kubernetes   ClusterIP      10.96.0.1        <none>        443/TCP        20h
-nginx        LoadBalancer   10.108.132.235   <pending>     80:31375/TCP   37m
-suda@debian:~$
-```
-
-### ホスト名ベースのロードバランサを設定する
-
-このままでは，複数のWebサービスを起動しても競合してしまうので，ディレクトリ名ベースかホスト名ベースでサービスへのエントリーを分ける必要がある．
-ここでは，ホスト名ベースでサービスを分けるやり方を記述する．
-参考ページは，先程も示したKubernetesのIngressのページである．
-[Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
-
-まずは，設定ファイル```ingress.yaml```を以下のように編集する．
 ここで，```host```の項目に付けた名称毎にサービスを分けることができる．
 ここでは，```nip.io```のサービスを利用しているが，本来はDNSの設定でCNAMEを記載するのが普通である．
 
@@ -567,16 +888,27 @@ spec:
           servicePort: 8001
 ```
 
-次に，以下のようにIngressの設定ファイルをリロードし，情報を表示させてみよう．
+以下のようにして上記ファイルを読み込ませる．
+続けて確認方法も示す．
+正常であれば以下のように表示されるはずである．
+
+
+```
+suda@kube01:~$ kubectl create -f ingress.yaml
+ingress "test-ingress" created
+
+suda@kube01:~$ kubectl get ingress
+NAME           HOSTS                                                       ADDRESS   PORTS     AGE
+greeting       greeting.172.16.121.165.nip.io                                        80        21h
+test-ingress   web.172.16.121.165.nip.io,dashboard.172.16.121.165.nip.io             80        1h
+suda@kube01:~$
+```
+
+もし，設定ファイルの記述を誤った場合は，設定ファイルを編集した後リロードすれば良い．
 
 ```
 suda@debian:~$ kubectl replace -f ingress.yaml
 ingress "test-ingress" replaced
-
-suda@debian:~$ kubectl get ingress
-NAME           HOSTS                                                       ADDRESS   PORTS     AGE
-test-ingress   web.172.16.121.165.nip.io,dashboard.172.16.121.165.nip.io             80        4h
-suda@debian:~$
 ```
 
 ## Kubernetes Dashboardを動かしてみる
