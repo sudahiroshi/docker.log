@@ -635,6 +635,11 @@ Starting to serve on [::]:8001
 
 [【IBM Cloud k8s】WebUI (Dashboard)への認証方法のメモ](https://qiita.com/MahoTakara/items/fc2e3758d0418001b0a2)
 
+上記の方法では，ログイン画面までは表示されたがそこから先に進めなかった．
+もしかしたら下記URLの方法でうまくいくかも．
+
+[CentOS7 kubespray で kubernetes(1.9) cluster を作る - その1 -](https://qiita.com/ainamori/items/cf24466c6c0f4cec16d5)
+
 ## 参考文献
 [自宅PCクラスタのKubernetesを1.9にバージョンアップしたログ](http://dr-asa.hatenablog.com/entry/2017/12/19/095008)
 [Get Docker CE for Ubuntu](https://docs.docker.com/engine/installation/linux/docker-ce/ubuntu/)
