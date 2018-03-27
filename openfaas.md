@@ -1,11 +1,11 @@
-kubeless.log
+OpenFaaS.log
 ===============
 
 Kubernetesを拡張して，FaaS(Function as a Service)の構築方法についてまとめる．
 これまで構築してきたKubernetes環境とは，若干異なるセットアップになるが，将来的には統合する予定である．
 そのため，共通部分はそのまま残してある．
 
-## kubeadmなどの関連コマンドのインストール
+## OpenFaaSの関連コマンドのインストール
 
 まずはこちらを参考にして，kubeadmなどのコマンドを，debianおよびnode2にインストールする．
 実際に行うのは実際に行うのは，```Installing kubeadm, kubelet and kubectl```の部分だけで良い．
@@ -370,329 +370,415 @@ node2     Ready     <none>    28m       v1.9.3    <none>        Debian GNU/Linux
 suda@debian:~$
 ```
 
-## Helmのインストール
+## faas-netesのインストール
 
 ここから先は以下のページを参考にインストールを進める．
-[Kubeless on Packet Cloud](https://medium.com/bitnami-perspectives/kubeless-on-packet-cloud-9e5605b8bb97)
+[Deployment guide for Kubernetes](https://github.com/openfaas/faas/blob/master/guide/deployment_k8s.md)
 
-Helmとは，Kubernetesのパッケージマネージャである．
-今回は，Helmを使ってIngress Controllerをインストールする．
-手順を一纏めにして以下に示す．
+元々，Docker Swarm向けにOpenFaaSが開発された．
+faas-netesとは，Kubernetesの仕組みに合わせたOpenFaaSである．
+今回は手順2.0bを参考にしながら進める．
 
-1. 環境変数```HELM_RELEASE```に最新版のバージョンを代入する
-2. helmコマンドの入ったtar.gzファイルをダウンロードする
-3. tarコマンドで展開する
-4. chmodで実行権限を付ける
-5. helmコマンドを```/usr/local/bin```に移動する
+まずはリポジトリをクローンする．
 
 ```
-suda@kube01:~$ HELM_RELEASE=v2.8.1
-
-suda@kube01:~$ wget -c https://storage.googleapis.com/kubernetes-helm/helm-${HELM_RELEASE}-linux-amd64.tar.gz
---2018-03-08 14:42:46--  https://storage.googleapis.com/kubernetes-helm/helm-v2.8.1-linux-amd64.tar.gz
-storage.googleapis.com (storage.googleapis.com) をDNSに問いあわせています... 172.217.31.144, 2404:6800:4004:808::2010
-storage.googleapis.com (storage.googleapis.com)|172.217.31.144|:443 に接続しています... 接続しました。
-HTTP による接続要求を送信しました、応答を待っています... 200 OK
-長さ: 14953924 (14M) [application/x-tar]
-`helm-v2.8.1-linux-amd64.tar.gz' に保存中
-
-helm-v2.8.1-linux-amd64.tar.gz                       100%[======================================================================================================================>]  14.26M  19.4MB/s    in 0.7s
-
-2018-03-08 14:42:47 (19.4 MB/s) - `helm-v2.8.1-linux-amd64.tar.gz' へ保存完了 [14953924/14953924]
-
-suda@kube01:~$ tar zxf helm-${HELM_RELEASE}-linux-amd64.tar.gz --strip 1 linux-amd64/helm
-
-suda@kube01:~$ chmod +x helm
-
-suda@kube01:~$ sudo mv helm /usr/local/bin/helm
+suda@kube01:~$ git clone https://github.com/openfaas/faas-netes
+Cloning into 'faas-netes'...
+remote: Counting objects: 3332, done.
+remote: Total 3332 (delta 0), reused 0 (delta 0), pack-reused 3332
+Receiving objects: 100% (3332/3332), 4.16 MiB | 1.72 MiB/s, done.
+Resolving deltas: 100% (1682/1682), done.
 suda@kube01:~$
 ```
 
-続いて，RBAC(Role-Based Access Control)を有効にする．
-まずは，ServiceAccountとしてtillerを登録するためのYAMLファイルを作成する．
-ファイル名はrbac-config.yamlとする．
+続いて，ディレクトリを移動し，kubectlコマンドを用いてデプロイする．
 
 ```
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: tiller
-  namespace: kube-system
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  name: tiller
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-  - kind: ServiceAccount
-    name: tiller
-    namespace: kube-system
+suda@kube01:~$ cd faas-netes
+
+suda@kube01:~/faas-netes$ kubectl apply -f ./namespaces.yml,./yaml
+namespace "openfaas" created
+namespace "openfaas-fn" created
+service "alertmanager" created
+deployment "alertmanager" created
+configmap "alertmanager-config" created
+service "faas-netesd" created
+deployment "faas-netesd" created
+deployment "gateway" created
+service "gateway" created
+service "nats" created
+deployment "nats" created
+service "prometheus" created
+deployment "prometheus" created
+configmap "prometheus-config" created
+deployment "queue-worker" created
+serviceaccount "faas-controller" created
+role "faas-controller" created
+rolebinding "faas-controller-fn" created
+suda@kube01:~/faas-netes$
 ```
 
-続いて，Kubernetesに登録する．
+ここでpodを確認すると，エラーが出るが正常である．
+開発者いわく，「NATの準備に少し掛かるので数回やり直す．環境によるが数十秒待てば良い」とのことなので安心して欲しい．
 
 ```
-suda@kube01:~$ kubectl create -f rbac-config.yaml
-serviceaccount "tiller" created
-clusterrolebinding "tiller" created
-suda@kube01:~$
+suda@kube01:~/faas-netes$ kubectl get pods --all-namespaces
+NAMESPACE     NAME                             READY     STATUS              RESTARTS   AGE
+kube-system   etcd-kube01                      1/1       Running             0          54s
+kube-system   kube-apiserver-kube01            1/1       Running             0          28s
+kube-system   kube-controller-manager-kube01   1/1       Running             0          36s
+kube-system   kube-dns-6f4fd4bdf-zssjf         3/3       Running             0          1m
+kube-system   kube-flannel-ds-tg4l6            1/1       Running             0          1m
+kube-system   kube-proxy-j5pqx                 1/1       Running             0          1m
+kube-system   kube-scheduler-kube01            1/1       Running             0          27s
+openfaas      alertmanager-76c4595457-q7cb2    1/1       Running             0          26s
+openfaas      faas-netesd-6b99db9f49-cznht     0/1       ContainerCreating   0          25s
+openfaas      gateway-7f5bcf864-c8r6p          0/1       Error               0          26s
+openfaas      nats-6c4f7df-z7zc4               0/1       ContainerCreating   0          25s
+openfaas      prometheus-65b9b5c86d-w2mb7      0/1       ContainerCreating   0          25s
+openfaas      queue-worker-676ccd9fb9-s4762    0/1       ContainerCreating   0          25s
+suda@kube01:~/faas-netes$
 ```
 
-作成したSErviceAccountを使ってHelmの初期化を行う．
+暫く待ってから確認すると，きちんとRunningになっている．
 
 ```
-suda@kube01:~$ helm init --service-account tiller
-Creating /home/suda/.helm
-Creating /home/suda/.helm/repository
-Creating /home/suda/.helm/repository/cache
-Creating /home/suda/.helm/repository/local
-Creating /home/suda/.helm/plugins
-Creating /home/suda/.helm/starters
-Creating /home/suda/.helm/cache/archive
-Creating /home/suda/.helm/repository/repositories.yaml
-Adding stable repo with URL: https://kubernetes-charts.storage.googleapis.com
-Adding local repo with URL: http://127.0.0.1:8879/charts
-$HELM_HOME has been configured at /home/suda/.helm.
-
-Tiller (the Helm server-side component) has been installed into your Kubernetes Cluster.
-Happy Helming!
-suda@kube01:~$
+suda@kube01:~/faas-netes$ kubectl get pods --all-namespaces
+NAMESPACE     NAME                             READY     STATUS    RESTARTS   AGE
+kube-system   etcd-kube01                      1/1       Running   0          6m
+kube-system   kube-apiserver-kube01            1/1       Running   0          6m
+kube-system   kube-controller-manager-kube01   1/1       Running   0          6m
+kube-system   kube-dns-6f4fd4bdf-zssjf         3/3       Running   0          7m
+kube-system   kube-flannel-ds-tg4l6            1/1       Running   0          7m
+kube-system   kube-proxy-j5pqx                 1/1       Running   0          7m
+kube-system   kube-scheduler-kube01            1/1       Running   0          6m
+openfaas      alertmanager-76c4595457-q7cb2    1/1       Running   0          6m
+openfaas      faas-netesd-6b99db9f49-cznht     1/1       Running   0          6m
+openfaas      gateway-7f5bcf864-c8r6p          1/1       Running   1          6m
+openfaas      nats-6c4f7df-z7zc4               1/1       Running   0          6m
+openfaas      prometheus-65b9b5c86d-w2mb7      1/1       Running   0          6m
+openfaas      queue-worker-676ccd9fb9-s4762    1/1       Running   0          6m
+suda@kube01:~/faas-netes$
 ```
 
-以上でHelmが利用可能になったので，次にnginx-ingressをインストールする．
+## faas-cliのインストール
+
+OpenFaaSに使用するコマンドのインストールを行う．
+と言っても，リポジトリからファイルをダウンロードして実行するだけである．
+インストールされるコマンドは```faas-cli```であるが，長いので```faas```というaliasが自動的に作られる．
 
 ```
-suda@kube01:~$ helm install --name nginx-ingress stable/nginx-ingress --set rbac.create=true,controller.service.type=NodePort,controller.service.nodePorts.http=30080
-NAME:   nginx-ingress
-LAST DEPLOYED: Thu Mar  8 14:44:10 2018
-NAMESPACE: default
-STATUS: DEPLOYED
+suda@kube01:~/faas-netes$ curl -sSL https://cli.openfaas.com | sudo sh
+x86_64
+Downloading package https://github.com/openfaas/faas-cli/releases/download/0.6.4/faas-cli as /tmp/faas-cli
+Download complete.
 
-RESOURCES:
-==> v1/ConfigMap
-NAME                      DATA  AGE
-nginx-ingress-controller  1     1s
-
-==> v1beta1/ClusterRoleBinding
-NAME           AGE
-nginx-ingress  1s
-
-==> v1beta1/Role
-NAME           AGE
-nginx-ingress  1s
-
-==> v1beta1/RoleBinding
-NAME           AGE
-nginx-ingress  1s
-
-==> v1/Service
-NAME                           TYPE       CLUSTER-IP      EXTERNAL-IP  PORT(S)                     AGE
-nginx-ingress-controller       NodePort   10.105.152.127  <none>       80:30080/TCP,443:30935/TCP  1s
-nginx-ingress-default-backend  ClusterIP  10.96.18.249    <none>       80/TCP                      1s
-
-==> v1/ServiceAccount
-NAME           SECRETS  AGE
-nginx-ingress  1        1s
-
-==> v1beta1/ClusterRole
-NAME           AGE
-nginx-ingress  1s
-
-==> v1beta1/Deployment
-NAME                           DESIRED  CURRENT  UP-TO-DATE  AVAILABLE  AGE
-nginx-ingress-controller       1        1        1           0          1s
-nginx-ingress-default-backend  1        1        1           0          1s
-
-==> v1beta1/PodDisruptionBudget
-NAME                           MIN AVAILABLE  MAX UNAVAILABLE  ALLOWED DISRUPTIONS  AGE
-nginx-ingress-controller       1              N/A              0                    1s
-nginx-ingress-default-backend  1              N/A              0                    0s
-
-==> v1/Pod(related)
-NAME                                            READY  STATUS             RESTARTS  AGE
-nginx-ingress-controller-7bf445fd-wdzgq         0/1    ContainerCreating  0         0s
-nginx-ingress-default-backend-6664bc64c9-2cgfv  0/1    ContainerCreating  0         0s
-
-
-NOTES:
-The nginx-ingress controller has been installed.
-Get the application URL by running these commands:
-  export HTTP_NODE_PORT=30080
-  export HTTPS_NODE_PORT=$(kubectl --namespace default get services -o jsonpath="{.spec.ports[1].nodePort}" nginx-ingress-controller)
-  export NODE_IP=$(kubectl --namespace default get nodes -o jsonpath="{.items[0].status.addresses[1].address}")
-
-  echo "Visit http://$NODE_IP:$HTTP_NODE_PORT to access your application via HTTP."
-  echo "Visit https://$NODE_IP:$HTTPS_NODE_PORT to access your application via HTTPS."
-
-An example Ingress that makes use of the controller:
-
-  apiVersion: extensions/v1beta1
-  kind: Ingress
-  metadata:
-    annotations:
-      kubernetes.io/ingress.class: nginx
-    name: example
-    namespace: foo
-  spec:
-    rules:
-      - host: www.example.com
-        http:
-          paths:
-            - backend:
-                serviceName: exampleService
-                servicePort: 80
-              path: /
-    # This section is only required if TLS is to be enabled for the Ingress
-    tls:
-        - hosts:
-            - www.example.com
-          secretName: example-tls
-
-If TLS is enabled for the Ingress, a Secret containing the certificate and key must also be provided:
-
-  apiVersion: v1
-  kind: Secret
-  metadata:
-    name: example-tls
-    namespace: foo
-  data:
-    tls.crt: <base64 encoded cert>
-    tls.key: <base64 encoded key>
-  type: kubernetes.io/tls
-
-suda@kube01:~$
+Running as root - Attemping to move faas-cli to /usr/local/bin
+New version of faas-cli installed to /usr/local/bin
+Creating alias 'faas' for 'faas-cli'.
+suda@kube01:~/faas-netes$
 ```
 
-## Kubelessのインストール
-
-### Kubeless環境のインストール
-
-Ingress Contollerをインストールしたので，続いてKubeless環境をインストールする．
-順番に，以下のことを行っていく．
-1. ```RELEASE```に最新版のバージョンを代入する
-2. Kubernetesに```kubeless```というNamespaceを登録する
-3. YAMLファイルをダウンロードする
-4. YAMLファイルを基に，Kubelessを起動する
+うまくインストールされていれば，以下のように実行できる．
 
 ```
-suda@kube01:~$ export RELEASE=v0.4.0
+suda@kube01:~/faas-netes$ faas
+  ___                   _____           ____
+ / _ \ _ __   ___ _ __ |  ___|_ _  __ _/ ___|
+| | | | '_ \ / _ \ '_ \| |_ / _` |/ _` \___ \
+| |_| | |_) |  __/ | | |  _| (_| | (_| |___) |
+ \___/| .__/ \___|_| |_|_|  \__,_|\__,_|____/
+      |_|
 
-suda@kube01:~$ kubectl create namespace kubeless
 
-namespace "kubeless" created
-suda@kube01:~$ curl -LO https://github.com/kubeless/kubeless/releases/download/${RELEASE}/kubeless-rbac-${RELEASE}.yaml
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-100   615    0   615    0     0    799      0 --:--:-- --:--:-- --:--:--   800
-100  9525  100  9525    0     0   5923      0  0:00:01  0:00:01 --:--:-- 11773
+Manage your OpenFaaS functions from the command line
 
-suda@kube01:~$ kubectl create -f kubeless-rbac-${RELEASE}.yaml
-service "zoo" created
-deployment "kubeless-controller" created
-clusterrolebinding "kubeless-controller-deployer" created
-customresourcedefinition "functions.kubeless.io" created
-service "broker" created
-service "kafka" created
-statefulset "zoo" created
-service "zookeeper" created
-configmap "kubeless-config" created
-serviceaccount "controller-acct" created
-clusterrole "kubeless-controller-deployer" created
-statefulset "kafka" created
-suda@kube01:~$
+Usage:
+  faas-cli [flags]
+  faas-cli [command]
+
+Available Commands:
+  build          Builds OpenFaaS function containers
+  deploy         Deploy OpenFaaS functions
+  help           Help about any command
+  invoke         Invoke an OpenFaaS function
+  list           List OpenFaaS functions
+  login          Log in to OpenFaaS gateway
+  logout         Log out from OpenFaaS gateway
+  new            Create a new template in the current folder with the name given as name
+  push           Push OpenFaaS functions to remote registry (Docker Hub)
+  remove         Remove deployed OpenFaaS functions
+  store          OpenFaaS store commands
+  template       Downloads templates from the specified github repo
+  version        Display the clients version information
+
+Flags:
+      --filter string   Wildcard to match with function names in YAML file
+  -h, --help            help for faas-cli
+      --regex string    Regex to match with function names in YAML file
+  -f, --yaml string     Path to YAML file describing function(s)
+
+Use "faas-cli [command] --help" for more information about a command.
+suda@kube01:~/faas-netes$
 ```
 
-### kubelssコマンドのセットアップ
+### サンプルの起動
 
-順番が前後するが，```kubeless```コマンドのセットアップも行う．
-順番に以下のことを実行している．
-1. unzipパッケージのインストール
-2. kubelessコマンドの圧縮ファイルのダウンロード
-3. kubelessコマンドの展開
-4. 実行属性の付与
-5. ```/usr/loca/bin```に移動
-6. 動作確認のためにバージョンを表示させる
+特に問題なくインストールできたと思う．
+それではサンプルとして配布されているfunctionを起動してみよう．
+まずはダウンロード．
 
 ```
-suda@kube01:~$ sudo apt-get install -y unzip
-パッケージリストを読み込んでいます... 完了
-依存関係ツリーを作成しています
-状態情報を読み取っています... 完了
-提案パッケージ:
-  zip
-以下のパッケージが新たにインストールされます:
-  unzip
-アップグレード: 0 個、新規インストール: 1 個、削除: 0 個、保留: 4 個。
-170 kB のアーカイブを取得する必要があります。
-この操作後に追加で 547 kB のディスク容量が消費されます。
-取得:1 http://ftp.jp.debian.org/debian stretch/main amd64 unzip amd64 6.0-21 [170 kB]
-170 kB を 0秒 で取得しました (543 kB/s)
-以前に未選択のパッケージ unzip を選択しています。
-(データベースを読み込んでいます ... 現在 51307 個のファイルとディレクトリがインストールされています。)
-.../unzip_6.0-21_amd64.deb を展開する準備をしています ...
-unzip (6.0-21) を展開しています...
-mime-support (3.60) のトリガを処理しています ...
-unzip (6.0-21) を設定しています ...
+suda@kube01:~/faas-netes$ cd ..
 
-suda@kube01:~$ wget -c https://github.com/kubeless/kubeless/releases/download/${RELEASE}/kubeless_linux-amd64.zip
---2018-03-08 14:48:54--  https://github.com/kubeless/kubeless/releases/download/v0.4.0/kubeless_linux-amd64.zip
-github.com (github.com) をDNSに問いあわせています... 192.30.253.113, 192.30.253.112
-github.com (github.com)|192.30.253.113|:443 に接続しています... 接続しました。
-HTTP による接続要求を送信しました、応答を待っています... 302 Found
-場所: https://github-production-release-asset-2e65be.s3.amazonaws.com/73902337/c119333e-10be-11e8-93bf-cf0183e444d4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20180308%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20180308T054855Z&X-Amz-Expires=300&X-Amz-Signature=a660e31a8f9fa44b57e45b6124218318c711fed138586a16da23cecf7d3ba347&X-Amz-SignedHeaders=host&actor_id=0&response-content-disposition=attachment%3B%20filename%3Dkubeless_linux-amd64.zip&response-content-type=application%2Foctet-stream [続く]
---2018-03-08 14:48:55--  https://github-production-release-asset-2e65be.s3.amazonaws.com/73902337/c119333e-10be-11e8-93bf-cf0183e444d4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20180308%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20180308T054855Z&X-Amz-Expires=300&X-Amz-Signature=a660e31a8f9fa44b57e45b6124218318c711fed138586a16da23cecf7d3ba347&X-Amz-SignedHeaders=host&actor_id=0&response-content-disposition=attachment%3B%20filename%3Dkubeless_linux-amd64.zip&response-content-type=application%2Foctet-stream
-github-production-release-asset-2e65be.s3.amazonaws.com (github-production-release-asset-2e65be.s3.amazonaws.com) をDNSに問いあわせています... 52.216.16.80
-github-production-release-asset-2e65be.s3.amazonaws.com (github-production-release-asset-2e65be.s3.amazonaws.com)|52.216.16.80|:443 に接続しています... 接続しました。
-HTTP による接続要求を送信しました、応答を待っています... 200 OK
-長さ: 6555227 (6.3M) [application/octet-stream]
-`kubeless_linux-amd64.zip' に保存中
+suda@kube01:~$ git clone https://github.com/openfaas/faas-cli
+Cloning into 'faas-cli'...
+remote: Counting objects: 13114, done.
+remote: Compressing objects: 100% (45/45), done.
+remote: Total 13114 (delta 27), reused 30 (delta 17), pack-reused 13052
+Receiving objects: 100% (13114/13114), 16.82 MiB | 4.73 MiB/s, done.
+Resolving deltas: 100% (2961/2961), done.
 
-kubeless_linux-amd64.zip                             100%[======================================================================================================================>]   6.25M  1.82MB/s    in 4.5s
+suda@kube01:~$ cd faas-cli
 
-2018-03-08 14:49:00 (1.38 MB/s) - `kubeless_linux-amd64.zip' へ保存完了 [6555227/6555227]
+suda@kube01:~/faas-cli$ ls
+CHANGELOG.md       Gopkg.toml     app.go            commands           guide               schema     vendor
+CONTRIBUTING.md    LICENSE        build.sh          config             legacy_cli.go       stack      version
+Dockerfile         MANUAL_CLI.md  build_redist.sh   contrib            legacy_cli_test.go  stack.yml  versioncontrol
+Dockerfile.redist  Makefile       build_samples.sh  deploy_samples.sh  proxy               template
+Gopkg.lock         README.md      builder           get.sh             sample              test
 
-suda@kube01:~$ unzip kubeless_linux-amd64.zip
-Archive:  kubeless_linux-amd64.zip
-   creating: bundles/kubeless_linux-amd64/
-  inflating: bundles/kubeless_linux-amd64/kubeless
-  
-suda@kube01:~$ chmod +x bundles/kubeless_linux-amd64/kubeless
+suda@kube01:~/faas-cli$ cd vendor/github.com/openfaas/faas/sample-functions/
 
-suda@kube01:~$ sudo mv bundles/kubeless_linux-amd64/kubeless /usr/local/bin/
-
-suda@kube01:~$ kubeless version
-Kubeless version: v0.4.0 (4f4f531f)
-suda@kube01:~$
+suda@kube01:~/faas-cli/vendor/github.com/openfaas/faas/sample-functions$ ls
+AlpineFunction           CHelloWorld        HostnameIntent  NodeInfo           SentimentAnalysis  echo
+ApiKeyProtected          CaptainsIntent     MarkdownRender  Phantomjs          WebhookStash       figlet
+ApiKeyProtected-Secrets  ChangeColorIntent  Nmap            README.md          WordCountFunction  gif-maker
+BaseFunctions            DockerHubStats     NodeHelloEnv    ResizeImageMagick  build_all.sh       samples.yml
+suda@kube01:~/faas-cli/vendor/github.com/openfaas/faas/sample-functions$
 ```
 
-### 確認
-
-ここまでの手順がきちんと動いていると，以下のように表示されるはずである．
-（```Kafka```と```zoo```の```STATUS```がInitになっているが，正常である）
-
-```
-suda@kube01:~$ kubectl get pods --namespace kubeless
-NAME                                  READY     STATUS     RESTARTS   AGE
-kafka-0                               0/1       Init:0/1   0          1m
-kubeless-controller-b54bc9db6-hkgnr   1/1       Running    0          1m
-zoo-0                                 0/1       Init:0/1   0          1m
-suda@kube01:~$
-```
-
-CRD(Custom Resource Definition)も確認してみる．
-以下のように表示されたら正常である．
-
+このディレクトリに存在する，samples.ymlを使用すると，サンプルが全てデプロイされる．
+ただし，Gatewayの項目だけ修正が必要である．
+samples.ymlの先頭10行を以下に示す．
+3行目に```gateway```の項目があるので，ここを書き換える．
 
 ```
-suda@kube01:~$ kubectl get crd
-NAME                    AGE
-functions.kubeless.io   29s
-suda@kube01:~$
+provider:
+  name: faas
+  gateway: http://localhost:8080  # can be a remote server
+
+functions:
+  alpinefunction:
+    lang: Dockerfile
+    handler: ./AlpineFunction
+    image: functions/alpine:0.6.9
+
 ```
+
+書き換える内容であるが，OpenFaaSを動かしているコンピュータのIPアドレスと，ポート番号31112を指定すれば良い．
+例えば，IPアドレスが172.16.121.165だとすると以下のようになる．
+※先頭3行のみを示す．
+
+```
+provider:
+  name: faas
+  gateway: http://172.16.121.165:31112  # can be a remote server
+```
+
+書き換えたらデプロしてみよう．
+
+```
+suda@kube01:~/faas-cli/vendor/github.com/openfaas/faas/sample-functions$ faas-cli deploy -f samples.yml
+Deploying: alpinefunction.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/alpinefunction
+
+Deploying: apikeyprotected.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/apikeyprotected
+
+Deploying: chelloworld.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/chelloworld
+
+Deploying: webhookstash.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/webhookstash
+
+Deploying: echo.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/echo
+
+Deploying: gif-maker.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/gif-maker
+
+Deploying: markdownrender.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/markdownrender
+
+Deploying: phantomjs.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/phantomjs
+
+Deploying: wordcountfunction.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/wordcountfunction
+
+Deploying: captainsintent.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/captainsintent
+
+Deploying: changecolorintent.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/changecolorintent
+
+Deploying: hostnameintent.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/hostnameintent
+
+Deploying: nodeinfo.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/nodeinfo
+
+Deploying: nmap.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/nmap
+
+Deploying: dockerhubstats.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/dockerhubstats
+
+Deploying: resizeimagemagick.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/resizeimagemagick
+
+Deploying: sentimentanalysis.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/sentimentanalysis
+
+suda@kube01:~/faas-cli/vendor/github.com/openfaas/faas/sample-functions$
+```
+
+登録されているfunctionの一覧を表示してみよう．
+Invocatinosは，実行回数である．
+Replicasは複製数で，きちんと複数nodeで構成して，かつ，負荷が上がると増えていくはずである．
+
+```
+suda@kube01:~/faas-cli/vendor/github.com/openfaas/faas/sample-functions$ faas-cli list -f samples.yml
+Function                      	Invocations    	Replicas
+alpinefunction                	0              	1
+apikeyprotected               	0              	1
+captainsintent                	0              	1
+changecolorintent             	0              	1
+chelloworld                   	0              	1
+dockerhubstats                	0              	1
+echo                          	0              	1
+gif-maker                     	0              	1
+hostnameintent                	0              	1
+markdownrender                	0              	1
+nmap                          	0              	1
+nodeinfo                      	0              	1
+phantomjs                     	0              	1
+resizeimagemagick             	0              	1
+sentimentanalysis             	0              	1
+webhookstash                  	0              	1
+wordcountfunction             	0              	1
+suda@kube01:~/faas-cli/vendor/github.com/openfaas/faas/sample-functions$
+```
+
+### CLIからfunctionを実行する
+
+それでは，以下のようにしてCLIからfunctionを実行してみよう．
+行頭のechoは，functionに渡す文字列の生成である．
+この例では何も渡していないが，好きな文字列（パラメータ）を渡すことができる．
+実行するfunctionは行末にある```nodeinfo```である．
+
+```
+suda@kube01:~/faas-cli/vendor/github.com/openfaas/faas/sample-functions$ echo -n "" | faas-cli invoke --gateway http://172.16.121.165:31112 nodeinfo
+Hostname: nodeinfo-6764d9c755-pzngc
+
+Platform: linux
+Arch: x64
+CPU count: 2
+Uptime: 9400
+suda@kube01:~/faas-cli/vendor/github.com/openfaas/faas/sample-functions$
+```
+
+nodeinfo特有であるが，もう少し詳細を表示したい場合は，以下のように実行することもできる．
+
+```
+suda@kube01:~/faas-cli/vendor/github.com/openfaas/faas/sample-functions$ echo -n "verbose" | faas-cli invoke --gateway http://172.16.121.165:31112 nodeinfo
+Hostname: nodeinfo-6764d9c755-pzngc
+
+Platform: linux
+Arch: x64
+CPU count: 2
+Uptime: 9429
+[ { model: 'Intel(R) Core(TM) i7-7700K CPU @ 4.20GHz',
+    speed: 4198,
+    times: { user: 1400100, nice: 4000, sys: 1143000, idle: 90532100, irq: 0 } },
+  { model: 'Intel(R) Core(TM) i7-7700K CPU @ 4.20GHz',
+    speed: 4198,
+    times:
+     { user: 1502200,
+       nice: 23400,
+       sys: 1148900,
+       idle: 90567100,
+       irq: 0 } } ]
+{ lo:
+   [ { address: '127.0.0.1',
+       netmask: '255.0.0.0',
+       family: 'IPv4',
+       mac: '00:00:00:00:00:00',
+       internal: true },
+     { address: '::1',
+       netmask: 'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff',
+       family: 'IPv6',
+       mac: '00:00:00:00:00:00',
+       scopeid: 0,
+       internal: true } ],
+  eth0:
+   [ { address: '10.244.0.71',
+       netmask: '255.255.255.0',
+       family: 'IPv4',
+       mac: '0a:58:0a:f4:00:47',
+       internal: false },
+     { address: 'fe80::54e5:66ff:fea4:cb58',
+       netmask: 'ffff:ffff:ffff:ffff::',
+       family: 'IPv6',
+       mac: '0a:58:0a:f4:00:47',
+       scopeid: 3,
+       internal: false } ] }
+suda@kube01:~/faas-cli/vendor/github.com/openfaas/faas/sample-functions$
+```
+
+### Webブラウザからfunctinoを実行する
+
+続いて，Webブラウザからfunctinoを実行してみよう．
+Webブラウザから```http://<サーバのIPアドレス>:31112/```にアクセスすると，OpenFaaS Portalが表示される．
+左側にfunctionが並んでいるので，実行したいfunctionを選ぶ．
+すると，右側に様々な情報が表示される．
+
+ここで，```Invoke```ボタンをクリックすると，その下に実行結果が表示される．
 
 ## Functionの登録
 
