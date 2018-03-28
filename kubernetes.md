@@ -581,6 +581,11 @@ suda@debian:~$
 
 ## Kubernetes Dashboardを動かしてみる
 
+Kubernetesクラスタの状態を表示するWebのインタフェースを動かしてみる．
+[kubernetes/dashboard](https://github.com/kubernetes/dashboard)
+
+それでは，```Getting start```の手順に従っていきなりデプロイする．
+
 ```
 suda@kube01:~$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/src/deploy/recommended/kubernetes-dashboard.yaml
 secret "kubernetes-dashboard-certs" created
@@ -591,6 +596,8 @@ deployment "kubernetes-dashboard" created
 service "kubernetes-dashboard" created
 suda@kube01:~$
 ```
+
+確認すると，```kubernetes-dashboard```から始まるPodが動いているのが分かる．
 
 ```
 suda@kube01:~$ kubectl get pods --all-namespaces
@@ -606,6 +613,8 @@ kube-system   kube-scheduler-kube01                   1/1       Running   0     
 kube-system   kubernetes-dashboard-5bd6f767c7-2r7t8   1/1       Running   0          2m
 suda@kube01:~$
 ```
+
+詳細を表示してみる．
 
 ```
 suda@kube01:~$ kubectl describe service kubernetes-dashboard -n kube-system
@@ -624,21 +633,88 @@ Events:            <none>
 suda@kube01:~$
 ```
 
+このままでは外部からアクセスできないので，proxyを動作させる．
+
 ```
-suda@kube01:~$ kubectl proxy --address="0.0.0.0" -p 8001 --accept-hosts='^*$'
+suda@kube01:~$ kubectl proxy --address="0.0.0.0" -p 8001 --accept-hosts='^*$' &
 Starting to serve on [::]:8001
+suda@kube01:~$
 ```
 
 この状態であれば，他のホストから```http://<debianのIPアドレス>:8001/```にアクセスできる．
-実際に使う場合位は```http://<debianのIPアドレス>:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/#!/login```にアクセスする．
-この辺りのことは下記URlを参照すること．
+実際に使う場合は```http://<debianのIPアドレス>:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/#!/login```にアクセスする．
+アクセスすると，```Kubeconfig```と```Token```と書かれた，ログインページのようなものが表示される．
 
-[【IBM Cloud k8s】WebUI (Dashboard)への認証方法のメモ](https://qiita.com/MahoTakara/items/fc2e3758d0418001b0a2)
+しかし，このままでは権限の関係で先に進めないので，以下の手順で権限を付ける．
+[Creating sample user](https://github.com/kubernetes/dashboard/wiki/Creating-sample-user)
 
-上記の方法では，ログイン画面までは表示されたがそこから先に進めなかった．
-もしかしたら下記URLの方法でうまくいくかも．
+ここでは，```admin-user```というアカウントを作成し，```cluster-admin```というロールに割り当てる．
+まずは上記ページに掲載されているyamlファイルを作成する．
+ファイル名は特に指定されていないので，ここでは```admin-user.yaml```と```admin-role.yaml```としておく．
 
-[CentOS7 kubespray で kubernetes(1.9) cluster を作る - その1 -](https://qiita.com/ainamori/items/cf24466c6c0f4cec16d5)
+admin-user.yaml
+
+```
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kube-system
+```
+
+admin-role.yaml
+
+```
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kube-system
+```
+
+これらをkubectlを使って登録する．
+
+```
+suda@kube01:~/dashboard$ kubectl create -f admin-user.yaml
+serviceaccount "admin-user" created
+
+suda@kube01:~/dashboard$ kubectl create -f admin-role.yaml
+clusterrolebinding "admin-user" created
+suda@kube01:~/dashboard$
+```
+
+続いて，作成した```admin-user```のtokenを取得する．
+
+```
+suda@kube01:~/dashboard$ kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')
+Name:         admin-user-token-4bn95
+Namespace:    kube-system
+Labels:       <none>
+Annotations:  kubernetes.io/service-account.name=admin-user
+              kubernetes.io/service-account.uid=a13bd1c5-3254-11e8-a767-000c29966b2f
+
+Type:  kubernetes.io/service-account-token
+
+Data
+====
+token:      eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJhZG1pbi11c2VyLXRva2VuLTRibjk1Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImFkbWluLXVzZXIiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiJhMTNiZDFjNS0zMjU0LTExZTgtYTc2Ny0wMDBjMjk5NjZiMmYiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZS1zeXN0ZW06YWRtaW4tdXNlciJ9.ha-Lmyq8m9Ic_3TM145KAl_8BMiqXt-Ozfgyp8upu1oYWn0OJMwkO1pzUd1A-6EOewTLpgbIBFJwF9zDuHV1ShTI1vq2d4hxuslNLFt072GwQVmQOrF2uEEZ66fRvMeqd6FDHC4SxDcsBBNmflTwQQLfPEUCdPOhFlN1VX-lAIZTwsKUk6F_DAE2cv6ZtyT3pleoxZv5TRbTOzbbIYyJbCR-Xd2PcDDdBhJpgDEp8VE_9YPXAGjUetoENTvWEIyfG0ZnrrKyeCmj1yLGMibf4_ypUKXtDWLWZXuHwjuv-9LYnKy5a-N5tpgkge06nQn4BTb5rMxSJmC3dubpd5E4bA
+ca.crt:     1025 bytes
+namespace:  11 bytes
+suda@kube01:~/dashboard$
+```
+
+この中の，taken:の行にある```eyJh```で始まる文字列がtokenであるので，マウスで選択してコピーしておく．
+Webブラウザから，先程のDashboardを開き，```Token```を選択して，その下にある入力欄にペーストする．
+```SIGN IN```をクリックすると次に進みそうであるが，進まなかったので```Skip```をクリックしたら次に進んだ．
+
+Dashboardを表示させながら，コマンドを叩くことによって，動作がわかりやすくなるはずなので活用して欲しい．
 
 ## 参考文献
 [自宅PCクラスタのKubernetesを1.9にバージョンアップしたログ](http://dr-asa.hatenablog.com/entry/2017/12/19/095008)
