@@ -447,50 +447,50 @@ suda@debian:~$
 前節のままでは，サービスは起動しているが，外部からアクセスできない状態である．
 外部からサービスにアクセスするための仕組みが必要であり，KubernetesではIngressと呼ばれている．
 Ingressは仕組みの名称であり，実体にはLoadBalancerやNginxによるリバースProxyである．
-ここでは，Nghttpxを使用する．
+ここでは，HAProxy-ingressを使用する．
 
-インストール手順は下記に書いてある・・・はずであるが，正常に動作しなかった．
-[nghttpx-ingress-lb](https://github.com/zlabjp/nghttpx-ingress-lb)
+インストール手順は下記ページの```Deploy the ingress controller```の通りである．
+[setup-cluster.md](https://github.com/jcmoraisjr/haproxy-ingress/blob/master/examples/setup-cluster.md#five-minutes-deployment)
 
-そこで，こちらのページの内容を使って起動する．
-[月10ドルで海外VPSでKubernetesを試してみる（kubernetes v1.9版）](http://inajob.hatenablog.jp/entry/2018/02/28/%E6%9C%8810%E3%83%89%E3%83%AB%E3%81%A7%E6%B5%B7%E5%A4%96VPS%E3%81%A7Kubernetes%E3%82%92%E8%A9%A6%E3%81%97%E3%81%A6%E3%81%BF%E3%82%8B%EF%BC%88kubernetes_v1.9%E7%89%88%EF%BC%89)
-
-Masterやworkerのセットアップなどはすでに済んでいるので，ページの半分より少し下の「ingress-controllerのデプロイ」以下を実行する．
-まずはファイルのダウンロードから行う．（この手順は，ページの上の方で済ませていることが前提となっているので，ここで実行する）
+まずはdefault-backendを起動する．
 
 ```
-suda@debian:~$ git clone https://github.com/inajob/my-vps-kubernetes.git
-Cloning into 'my-vps-kubernetes'...
-remote: Counting objects: 36, done.
-remote: Compressing objects: 100% (27/27), done.
-remote: Total 36 (delta 6), reused 27 (delta 4), pack-reused 0
-Unpacking objects: 100% (36/36), done.
-
-suda@debian:~$ ls -F
-my-vps-kubernetes/
-
-suda@debian:~$ cd my-vps-kubernetes/
-
-suda@debian:~/my-vps-kubernetes$ ls -F
-init-scripts  kubeproxy.bat  manifests/
-suda@debian:~/my-vps-kubernetes$
+suda@kube01:~$ kubectl create -f https://raw.githubusercontent.com/jcmoraisjr/haproxy-ingress/master/docs/haproxy-ingress.yaml
+namespace "ingress-controller" created
+serviceaccount "ingress-controller" created
+clusterrole "ingress-controller" created
+role "ingress-controller" created
+clusterrolebinding "ingress-controller" created
+rolebinding "ingress-controller" created
+deployment "ingress-default-backend" created
+service "ingress-default-backend" created
+configmap "haproxy-ingress" created
+daemonset "haproxy-ingress" created
+suda@kube01:~$
 ```
 
-それではIngress Controllerを起動する．
+その後，node名を調べてroleを指定する．
 
 ```
-suda@debian:~/my-vps-kubernetes$ kubectl apply -f manifests/ingress-controller/
-deployment "default-http-backend" created
-service "default-http-backend" created
-Warning: kubectl apply should be used on resource created by either kubectl create --save-config or kubectl apply
-serviceaccount "ingress" configured
-clusterrole "ingress-clusterrole" created
-role "ingress-role" created
-rolebinding "ingress-role-binding" created
-clusterrolebinding "ingress-clusterrole-binding" created
-deployment "nghttpx-ingress-controller" created
-service "nginhttpx-health" created
-suda@debian:~/my-vps-kubernetes$
+suda@kube01:~$ kubectl get node
+NAME      STATUS    ROLES     AGE       VERSION
+kube01    Ready     master    19m       v1.9.3
+
+suda@kube01:~$ kubectl label node kube01 role=ingress-controller
+node "kube01" labeled
+
+suda@kube01:~$ kubectl -n ingress-controller get ds
+NAME              DESIRED   CURRENT   READY     UP-TO-DATE   AVAILABLE   NODE SELECTOR             AGE
+haproxy-ingress   1         1         0         1            0           role=ingress-controller   19m
+suda@kube01:~$
+```
+
+参考までに，ここで与えるのはnode名でなければならず，IPアドレスを指定してもエラーとなった．
+
+```
+suda@kube01:~$ kubectl label node 172.16.121.165 role=ingress-controller
+Error from server (NotFound): nodes "172.16.121.165" not found
+suda@kube01:~$ 
 ```
 
 続いて，すでに起動しているnginxのサービスを，外部に公開するための設定ファイルを記述する．
