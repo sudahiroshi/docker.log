@@ -379,6 +379,9 @@ suda@debian:~$
 ### Kubeless環境のインストール
 
 Ingress Contollerをインストールしたので，続いてKubeless環境をインストールする．
+これ以降は以下のドキュメントを参考に進めていく．
+[Installation](http://kubeless.io/docs/quick-start/)
+
 順番に，以下のことを行っていく．
 1. ```RELEASE```に最新版のバージョンを代入する
 2. Kubernetesに```kubeless```というNamespaceを登録する
