@@ -370,202 +370,9 @@ node2     Ready     <none>    28m       v1.9.3    <none>        Debian GNU/Linux
 suda@debian:~$
 ```
 
-## Helmのインストール
+## Ingress Controllerのインストール
 
-ここから先は以下のページを参考にインストールを進める．
-[Kubeless on Packet Cloud](https://medium.com/bitnami-perspectives/kubeless-on-packet-cloud-9e5605b8bb97)
-
-Helmとは，Kubernetesのパッケージマネージャである．
-今回は，Helmを使ってIngress Controllerをインストールする．
-手順を一纏めにして以下に示す．
-
-1. 環境変数```HELM_RELEASE```に最新版のバージョンを代入する
-2. helmコマンドの入ったtar.gzファイルをダウンロードする
-3. tarコマンドで展開する
-4. chmodで実行権限を付ける
-5. helmコマンドを```/usr/local/bin```に移動する
-
-```
-suda@kube01:~$ HELM_RELEASE=v2.8.1
-
-suda@kube01:~$ wget -c https://storage.googleapis.com/kubernetes-helm/helm-${HELM_RELEASE}-linux-amd64.tar.gz
---2018-03-08 14:42:46--  https://storage.googleapis.com/kubernetes-helm/helm-v2.8.1-linux-amd64.tar.gz
-storage.googleapis.com (storage.googleapis.com) をDNSに問いあわせています... 172.217.31.144, 2404:6800:4004:808::2010
-storage.googleapis.com (storage.googleapis.com)|172.217.31.144|:443 に接続しています... 接続しました。
-HTTP による接続要求を送信しました、応答を待っています... 200 OK
-長さ: 14953924 (14M) [application/x-tar]
-`helm-v2.8.1-linux-amd64.tar.gz' に保存中
-
-helm-v2.8.1-linux-amd64.tar.gz                       100%[======================================================================================================================>]  14.26M  19.4MB/s    in 0.7s
-
-2018-03-08 14:42:47 (19.4 MB/s) - `helm-v2.8.1-linux-amd64.tar.gz' へ保存完了 [14953924/14953924]
-
-suda@kube01:~$ tar zxf helm-${HELM_RELEASE}-linux-amd64.tar.gz --strip 1 linux-amd64/helm
-
-suda@kube01:~$ chmod +x helm
-
-suda@kube01:~$ sudo mv helm /usr/local/bin/helm
-suda@kube01:~$
-```
-
-続いて，RBAC(Role-Based Access Control)を有効にする．
-まずは，ServiceAccountとしてtillerを登録するためのYAMLファイルを作成する．
-ファイル名はrbac-config.yamlとする．
-
-```
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: tiller
-  namespace: kube-system
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  name: tiller
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-  - kind: ServiceAccount
-    name: tiller
-    namespace: kube-system
-```
-
-続いて，Kubernetesに登録する．
-
-```
-suda@kube01:~$ kubectl create -f rbac-config.yaml
-serviceaccount "tiller" created
-clusterrolebinding "tiller" created
-suda@kube01:~$
-```
-
-作成したSErviceAccountを使ってHelmの初期化を行う．
-
-```
-suda@kube01:~$ helm init --service-account tiller
-Creating /home/suda/.helm
-Creating /home/suda/.helm/repository
-Creating /home/suda/.helm/repository/cache
-Creating /home/suda/.helm/repository/local
-Creating /home/suda/.helm/plugins
-Creating /home/suda/.helm/starters
-Creating /home/suda/.helm/cache/archive
-Creating /home/suda/.helm/repository/repositories.yaml
-Adding stable repo with URL: https://kubernetes-charts.storage.googleapis.com
-Adding local repo with URL: http://127.0.0.1:8879/charts
-$HELM_HOME has been configured at /home/suda/.helm.
-
-Tiller (the Helm server-side component) has been installed into your Kubernetes Cluster.
-Happy Helming!
-suda@kube01:~$
-```
-
-以上でHelmが利用可能になったので，次にnginx-ingressをインストールする．
-
-```
-suda@kube01:~$ helm install --name nginx-ingress stable/nginx-ingress --set rbac.create=true,controller.service.type=NodePort,controller.service.nodePorts.http=30080
-NAME:   nginx-ingress
-LAST DEPLOYED: Thu Mar  8 14:44:10 2018
-NAMESPACE: default
-STATUS: DEPLOYED
-
-RESOURCES:
-==> v1/ConfigMap
-NAME                      DATA  AGE
-nginx-ingress-controller  1     1s
-
-==> v1beta1/ClusterRoleBinding
-NAME           AGE
-nginx-ingress  1s
-
-==> v1beta1/Role
-NAME           AGE
-nginx-ingress  1s
-
-==> v1beta1/RoleBinding
-NAME           AGE
-nginx-ingress  1s
-
-==> v1/Service
-NAME                           TYPE       CLUSTER-IP      EXTERNAL-IP  PORT(S)                     AGE
-nginx-ingress-controller       NodePort   10.105.152.127  <none>       80:30080/TCP,443:30935/TCP  1s
-nginx-ingress-default-backend  ClusterIP  10.96.18.249    <none>       80/TCP                      1s
-
-==> v1/ServiceAccount
-NAME           SECRETS  AGE
-nginx-ingress  1        1s
-
-==> v1beta1/ClusterRole
-NAME           AGE
-nginx-ingress  1s
-
-==> v1beta1/Deployment
-NAME                           DESIRED  CURRENT  UP-TO-DATE  AVAILABLE  AGE
-nginx-ingress-controller       1        1        1           0          1s
-nginx-ingress-default-backend  1        1        1           0          1s
-
-==> v1beta1/PodDisruptionBudget
-NAME                           MIN AVAILABLE  MAX UNAVAILABLE  ALLOWED DISRUPTIONS  AGE
-nginx-ingress-controller       1              N/A              0                    1s
-nginx-ingress-default-backend  1              N/A              0                    0s
-
-==> v1/Pod(related)
-NAME                                            READY  STATUS             RESTARTS  AGE
-nginx-ingress-controller-7bf445fd-wdzgq         0/1    ContainerCreating  0         0s
-nginx-ingress-default-backend-6664bc64c9-2cgfv  0/1    ContainerCreating  0         0s
-
-
-NOTES:
-The nginx-ingress controller has been installed.
-Get the application URL by running these commands:
-  export HTTP_NODE_PORT=30080
-  export HTTPS_NODE_PORT=$(kubectl --namespace default get services -o jsonpath="{.spec.ports[1].nodePort}" nginx-ingress-controller)
-  export NODE_IP=$(kubectl --namespace default get nodes -o jsonpath="{.items[0].status.addresses[1].address}")
-
-  echo "Visit http://$NODE_IP:$HTTP_NODE_PORT to access your application via HTTP."
-  echo "Visit https://$NODE_IP:$HTTPS_NODE_PORT to access your application via HTTPS."
-
-An example Ingress that makes use of the controller:
-
-  apiVersion: extensions/v1beta1
-  kind: Ingress
-  metadata:
-    annotations:
-      kubernetes.io/ingress.class: nginx
-    name: example
-    namespace: foo
-  spec:
-    rules:
-      - host: www.example.com
-        http:
-          paths:
-            - backend:
-                serviceName: exampleService
-                servicePort: 80
-              path: /
-    # This section is only required if TLS is to be enabled for the Ingress
-    tls:
-        - hosts:
-            - www.example.com
-          secretName: example-tls
-
-If TLS is enabled for the Ingress, a Secret containing the certificate and key must also be provided:
-
-  apiVersion: v1
-  kind: Secret
-  metadata:
-    name: example-tls
-    namespace: foo
-  data:
-    tls.crt: <base64 encoded cert>
-    tls.key: <base64 encoded key>
-  type: kubernetes.io/tls
-
-suda@kube01:~$
-```
+あとで書く
 
 ## Kubelessのインストール
 
@@ -577,6 +384,8 @@ Ingress Contollerをインストールしたので，続いてKubeless環境を�
 2. Kubernetesに```kubeless```というNamespaceを登録する
 3. YAMLファイルをダウンロードする
 4. YAMLファイルを基に，Kubelessを起動する
+
+なお，ドキュメントによると最新バージョンはv0.5.0のようであるが，試したところkubeless-controller-managerのコンテナが起動しなかったのでv0.4.0を使用する．
 
 ```
 suda@kube01:~$ export RELEASE=v0.4.0
@@ -773,11 +582,10 @@ suda@kube01:~/kubeless$
 
 この状態であれば，curlコマンドやWebブラウザからアクセス可能である．
 以下にcurlコマンドを使ってアクセスした例を示す．
-HTTPヘッダに```Host```情報が必要な点と，ポート番号が30080になっていることに気をつけてほしい．
 なお，hello.pyでは表示時に改行が付けられていないので，プロンプトと一緒になっている．
 
 ```
-suda@kube01:~/kubeless$ curl --header "Host: greeting.172.16.121.165.nip.io" 172.16.121.165:30080
+suda@kube01:~/kubeless$ curl greeting.172.16.121.165.nip.io
 hello, world!suda@kube01:~/kubeless$
 ```
 
