@@ -782,9 +782,64 @@ Webブラウザから```http://<サーバのIPアドレス>:31112/```にアク�
 
 ## Functionの登録
 
-参考サイトに従って，Pythonで書かれた```hello.py```というプログラムを，Function名```greeting```として登録してみる．
 
-### Functionの登録
+
+### オンプレミスのDocker Registry
+
+OpenFaaSでは，Docker Registryに登録されているDocker ImageをダウンロードしてFunctionとして利用するスタイルを用いている．
+この辺りは，FaaSによって様々で，Kubelessでは作成したプログラムにランタイムを適用するだけでFunctionとして利用できる．
+優劣が有るわけではなく，スタイルの違いである．
+
+ここではOpenFaaSを用いるので，Functionを含んだDocker ImageをRegistryに登録する必要がある．
+DockerHubに登録しても良いが，練習のために使用するのははばかられるので，オンプレミスで立ち上げることとする．
+
+オープンソースのRegistryがDockerHubに登録されているので，これを使用することとする．
+[registry](https://hub.docker.com/_/registry/)
+
+上記ページの```Run a local registry: Quick Version```に従ってデプロイする．
+Dockerコマンドを用いているが，気が向いたらKubernetes用のYAMLファイルを作る予定である．
+なお，下記のように起動した場合，コンテナを停止するとRegistryの内容がクリアされるので注意すること．
+
+```
+suda@kube01:~$ docker run -d --rm -p 5000:5000 --name registry registry:2
+d2bc14c3a5d9c84877590dc3c0102e438b10f6b293f93c3e6b4db00873161649
+suda@kube01:~$
+```
+
+動作確認手順を以下に示す．
+実際には，以下のことを順番に行っている．
+1. DockerHubからubuntuのイメージをPullする
+2. アップロード先とイメージ名をtagで指定する
+3. Pushする
+
+
+```
+suda@kube01:~$ docker pull ubuntu
+Using default tag: latest
+latest: Pulling from library/ubuntu
+22dc81ace0ea: Pull complete
+1a8b3c87dba3: Pull complete
+91390a1c435a: Pull complete
+07844b14977e: Pull complete
+b78396653dae: Pull complete
+Digest: sha256:e348fbbea0e0a0e73ab0370de151e7800684445c509d46195aef73e090a49bd6
+Status: Downloaded newer image for ubuntu:latest
+
+suda@kube01:~$ docker tag ubuntu localhost:5000/ubuntu
+
+suda@kube01:~$ docker push localhost:5000/ubuntu
+The push refers to a repository [localhost:5000/ubuntu]
+db584c622b50: Pushed
+52a7ea2bb533: Pushed
+52f389ea437e: Pushed
+88888b9b1b5b: Pushed
+a94e0d5a7c40: Pushed
+latest: digest: sha256:cd97af0adaa421c07b9fdf18a459a22bb00b00268bdb18d7e50080ce9c1112ab size: 1357
+suda@kube01:~$
+```
+
+無事にpushできていれば，きちんと動作している．
+
 
 まずは以下の内容を持つ```hello.py```を作成する．
 
