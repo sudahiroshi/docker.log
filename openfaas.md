@@ -782,8 +782,6 @@ Webブラウザから```http://<サーバのIPアドレス>:31112/```にアク�
 
 ## Functionの登録
 
-
-
 ### オンプレミスのDocker Registry
 
 OpenFaaSでは，Docker Registryに登録されているDocker ImageをダウンロードしてFunctionとして利用するスタイルを用いている．
@@ -839,53 +837,377 @@ suda@kube01:~$
 ```
 
 無事にpushできていれば，きちんと動作している．
+※このままでは複数台から構成されるKubernetesクラスタから使えない可能性があるので，その内きちんと設定方法を調べる予定である．
 
+### Functionの作成とデプロイ
 
-まずは以下の内容を持つ```hello.py```を作成する．
+それでは実際にFunctionを作成してみましょう．
+ここでは，下記の資料を見ながら作業を進めていきます．
+[OpenFaaS on a Kubernetes clusterを試してみた](https://qiita.com/TakanariKo/items/300bf690181fc647a10d)
 
-```
-def greeting():
-    return "hello, world!"
-```
-
-続いて，```hello.py```をFunctionとして登録する．
-
-```
-suda@kube01:~/kubeless$ kubeless function deploy greeting --runtime python2.7 --from-file hello.py --handler hello.greeting --trigger-http
-INFO[0000] Deploying function...
-INFO[0000] Function greeting submitted for deployment
-INFO[0000] Check the deployment status executing 'kubeless function ls greeting'
-suda@kube01:~/kubeless$
-```
-
-以下のようにして確認する．
+まずはディレクトリを作成し，テンプレートファイルをダウンロードします．
+最後のlsコマンドで，templateディレクトリが作られていることが分かります．
 
 ```
-suda@kube01:~/kubeless$ kubeless function ls
-NAME    	NAMESPACE	HANDLER       	RUNTIME  	TYPE	TOPIC	DEPENDENCIES	STATUS
-greeting	default  	hello.greeting	python2.7	HTTP	     	            	0/1 NOT READY
-suda@kube01:~/kubeless$
+suda@kube01:~$ mkdir hello-python
+
+suda@kube01:~$ cd hello-python
+
+suda@kube01:~/hello-python$ faas template pull
+Fetch templates from repository: https://github.com/openfaas/templates.git
+2018/03/29 11:55:50 Attempting to expand templates from https://github.com/openfaas/templates.git
+2018/03/29 11:55:51 Fetched 12 template(s) : [csharp dockerfile go go-armhf node node-arm64 node-armhf python python-armhf python3 python3-armhf ruby] from https://github.com/openfaas/templates.git
+
+suda@kube01:~/hello-python$ ls -F
+template/
+suda@kube01:~/hello-python$
 ```
 
-Python2.7のコンテナを用意するために，若干時間が掛かる．
-準備ができると以下のようになる．
+続いて，Python3テンプレートを使用したFunction```hello-python```を作成します．
+hello-pythonディレクトリとhello-python.ymlが作られていることが分かります．
 
 ```
-suda@kube01:~$ kubeless function ls
-NAME    	NAMESPACE	HANDLER       	RUNTIME  	TYPE	TOPIC	DEPENDENCIES	STATUS
-greeting	default  	hello.greeting	python2.7	HTTP	     	            	1/1 READY
-suda@kube01:~$
+suda@kube01:~/hello-python$ faas new hello-python --lang=python3
+Folder: hello-python created.
+  ___                   _____           ____
+ / _ \ _ __   ___ _ __ |  ___|_ _  __ _/ ___|
+| | | | '_ \ / _ \ '_ \| |_ / _` |/ _` \___ \
+| |_| | |_) |  __/ | | |  _| (_| | (_| |___) |
+ \___/| .__/ \___|_| |_|_|  \__,_|\__,_|____/
+      |_|
+
+
+Function created in folder: hello-python
+Stack file written: hello-python.yml
+
+suda@kube01:~/hello-python$ ls -F
+hello-python/  hello-python.yml  template/
+suda@kube01:~/hello-python$
 ```
 
-### Functionのテスト
-
-以下のようにすると，登録されたFunctionを実行できる．
+hello-python.ymlの内容は以下のようになっています．
 
 ```
-suda@kube01:~/kubeless$ kubeless function call greeting
-hello, world!
-suda@kube01:~/kubeless$
+provider:
+  name: faas
+  gateway: http://127.0.0.1:8080
+
+functions:
+  hello-python:
+    lang: python3
+    handler: ./hello-python
+    image: hello-python
 ```
+
+作られたhello-pythonディレクトリを覗いてみます．
+すると，3つのファイルが作られています．
+この中で，まず練習のために使用するのはhandler.pyです．
+内容を表示すると，reqを受け取ってreqを返すhandleというメソッドがあります．
+
+```
+suda@kube01:~/hello-python$ ls -F hello-python
+__init__.py  handler.py  requirements.txt
+
+suda@kube01:~/hello-python$ cat hello-python/handler.py
+def handle(req):
+    """handle a request to the function
+    Args:
+        req (str): request body
+    """
+
+    return req
+suda@kube01:~/hello-python$
+```
+
+それでは，handleの内容を書き換えてみましょう．
+
+```
+def handle(req):
+    """handle a request to the function
+    Args:
+        req (str): request body
+    """
+    print( "Welcome to OpenPaaS by Python" )
+    print( str )
+    return req
+```
+
+続いて，hello-python.ymlを書き換えます．
+書き換えるポイントは2つです．
+1つ目が，provider.gatewayです．この項目は，debianのIPアドレス:31112にしておいてください．
+2つ目が，functions.imageです．この項目は，リポジトリ名です．先ほどデプロイしたローカルのリポジトリを使用するように書き換えます．
+
+```
+provider:
+  name: faas
+  gateway: http://172.16.121.165:31112
+
+functions:
+  hello-python:
+    lang: python3
+    handler: ./hello-python
+    image: localhost:5000/hello-python
+```
+
+それでは，hello-python.ymlを使ってコンテナイメージをビルドします．
+Python3テンプレートでは，alpineのイメージを元にして新たなイメージを作成します．
+ネットワーク環境によっては，alpineのダウンロードにしばらく時間を要するかもしれません．
+
+```
+suda@kube01:~/hello-python$ faas build -f hello-python.yml
+[0] > Building hello-python.
+Clearing temporary build folder: ./build/hello-python/
+Preparing ./hello-python/ ./build/hello-python/function
+Building: hello-python with python3 template. Please wait..
+Sending build context to Docker daemon  7.68 kB
+Step 1/16 : FROM python:3-alpine
+ ---> 4fcaf5fb5f2b
+Step 2/16 : RUN apk --no-cache add curl     && echo "Pulling watchdog binary from Github."     && curl -sSL https://github.com/openfaas/faas/releases/download/0.7.6/fwatchdog > /usr/bin/fwatchdog     && chmod +x /usr/bin/fwatchdog     && apk del curl --no-cache
+ ---> Using cache
+ ---> 0e0e4274386b
+Step 3/16 : WORKDIR /root/
+ ---> Using cache
+ ---> 174092ca0611
+Step 4/16 : COPY index.py .
+ ---> Using cache
+ ---> e13905fe4681
+Step 5/16 : COPY requirements.txt .
+ ---> Using cache
+ ---> 817eb77e6d8d
+Step 6/16 : RUN pip install -r requirements.txt
+ ---> Using cache
+ ---> 32a0cfc0591d
+Step 7/16 : RUN mkdir -p function
+ ---> Using cache
+ ---> 8588ca410e21
+Step 8/16 : RUN touch ./function/__init__.py
+ ---> Using cache
+ ---> 955247d60a1c
+Step 9/16 : WORKDIR /root/function/
+ ---> Using cache
+ ---> c0e21ff7c3e2
+Step 10/16 : COPY function/requirements.txt .
+provider:
+ ---> Using cache
+ ---> b2da0a585434
+Step 11/16 : RUN pip install -r requirements.txt
+ ---> Using cache
+ ---> e5a90cec86e6
+Step 12/16 : WORKDIR /root/
+ ---> Using cache
+ ---> 35600868649c
+Step 13/16 : COPY function function
+ ---> 9aac3726b629
+Removing intermediate container a261c6ffc2f4
+Step 14/16 : ENV fprocess "python3 index.py"
+ ---> Running in 5888690230e5
+ ---> 8e9eb19db684
+Removing intermediate container 5888690230e5
+Step 15/16 : HEALTHCHECK --interval=1s CMD [ -e /tmp/.lock ] || exit 1
+ ---> Running in db2d14e9f123
+ ---> b15eaca24450
+Removing intermediate container db2d14e9f123
+Step 16/16 : CMD fwatchdog
+ ---> Running in 31fadc248fbb
+ ---> 9d6553ad8358
+Removing intermediate container 31fadc248fbb
+Successfully built 9d6553ad8358
+Image: hello-python built.
+[0] < Building hello-python done.
+[0] worker done.
+suda@kube01:~/hello-python$
+```
+
+続いて，できあがったイメージをローカルのリポジトリに登録します．
+
+```
+suda@kube01:~/hello-python$ faas push -f hello-python.yml
+[0] > Pushing hello-python.
+The push refers to a repository [localhost:5000/hello-python]
+139edb40f230: Pushed
+df8a146b1da3: Pushed
+85269f63996d: Pushed
+e12a18f7076e: Pushed
+746defdaa29f: Pushed
+4fe6dc6d0808: Pushed
+5ac9550fccd9: Pushed
+aae31f4f40b2: Pushed
+88bb90ce2a55: Pushed
+f2e7d714d76b: Pushed
+efa0b7a2d37b: Pushed
+fe548f92b224: Pushed
+a7d53ea16e81: Pushed
+e53f74215d12: Pushed
+latest: digest: sha256:313ff2b86ef9b166b8ff0f806728e638a342dc48cb3752ee21dafa4c6b12a990 size: 3240
+[0] < Pushing hello-python done.
+[0] worker done.
+suda@kube01:~/hello-python$
+```
+
+実際にOpenFaaSにデプロイしてみます．
+
+```
+suda@kube01:~/hello-python$ faas deploy -f hello-python.yml
+Deploying: hello-python.
+
+Deployed. 202 Accepted.
+URL: http://172.16.121.165:31112/function/hello-python
+
+suda@kube01:~/hello-python$
+```
+
+上記のように```2020 Accepted```が表示されれば，無事にデプロイされています．
+CLIから動作を確認してみましょう．
+
+```
+suda@kube01:~/hello-python$ echo -n "test" | faas-cli invoke --gateway http://172.16.121.165:31112 hello-python
+Welcome to OpenPaaS by Python
+<class 'str'>
+test
+suda@kube01:~/hello-python$
+```
+
+handler.pyに書いたとおり，```Welcome to OpenPaaS by Python```が表示されました．
+その次の行がおかしいですね．
+実は，パラメータreqを表示しようと思っていたのですが，誤ってstrを表示しています．
+早速修正しましょう．
+
+### Functionの修正
+
+reqをstrに間違えたことは些細なことで，重要なのは修正時の手順です．
+まずはソースコードを修正します．
+
+```
+def handle(req):
+    """handle a request to the function
+    Args:
+        req (str): request body
+    """
+    print( "Welcome to OpenPaaS by Python" )
+    print( req )
+    return req
+```
+
+続いて，イメージをビルドします．
+alpineのイメージはキャッシュされているので，すぐに終わります．
+
+```
+suda@kube01:~/hello-python$ faas build -f hello-python.yml
+[0] > Building hello-python.
+Clearing temporary build folder: ./build/hello-python/
+Preparing ./hello-python/ ./build/hello-python/function
+Building: localhost:5000/hello-python with python3 template. Please wait..
+Sending build context to Docker daemon  7.68 kB
+Step 1/16 : FROM python:3-alpine
+ ---> 4fcaf5fb5f2b
+Step 2/16 : RUN apk --no-cache add curl     && echo "Pulling watchdog binary from Github."     && curl -sSL https://github.com/openfaas/faas/releases/download/0.7.6/fwatchdog > /usr/bin/fwatchdog     && chmod +x /usr/bin/fwatchdog     && apk del curl --no-cache
+ ---> Using cache
+ ---> 0e0e4274386b
+Step 3/16 : WORKDIR /root/
+ ---> Using cache
+ ---> 174092ca0611
+Step 4/16 : COPY index.py .
+ ---> Using cache
+ ---> e13905fe4681
+Step 5/16 : COPY requirements.txt .
+ ---> Using cache
+ ---> 817eb77e6d8d
+Step 6/16 : RUN pip install -r requirements.txt
+ ---> Using cache
+ ---> 32a0cfc0591d
+Step 7/16 : RUN mkdir -p function
+ ---> Using cache
+ ---> 8588ca410e21
+Step 8/16 : RUN touch ./function/__init__.py
+ ---> Using cache
+ ---> 955247d60a1c
+Step 9/16 : WORKDIR /root/function/
+ ---> Using cache
+ ---> c0e21ff7c3e2
+Step 10/16 : COPY function/requirements.txt .
+ ---> Using cache
+ ---> b2da0a585434
+Step 11/16 : RUN pip install -r requirements.txt
+ ---> Using cache
+ ---> e5a90cec86e6
+Step 12/16 : WORKDIR /root/
+ ---> Using cache
+ ---> 35600868649c
+Step 13/16 : COPY function function
+ ---> 27d11415b115
+Removing intermediate container 036c20a94a17
+Step 14/16 : ENV fprocess "python3 index.py"
+ ---> Running in 003497cea4be
+ ---> dcb3d460b73d
+Removing intermediate container 003497cea4be
+Step 15/16 : HEALTHCHECK --interval=1s CMD [ -e /tmp/.lock ] || exit 1
+ ---> Running in e507b857bf76
+ ---> 84eac792868c
+Removing intermediate container e507b857bf76
+Step 16/16 : CMD fwatchdog
+ ---> Running in 350a751ec2ff
+ ---> eec79d2f1591
+Removing intermediate container 350a751ec2ff
+Successfully built eec79d2f1591
+Image: localhost:5000/hello-python built.
+[0] < Building hello-python done.
+[0] worker done.
+suda@kube01:~/hello-python$
+```
+
+続いて，ローカルのリポジトリにアップロードします．
+変更がない部分については処理がスキップされるので，こちらもすぐに終わります．
+
+```
+suda@kube01:~/hello-python$ faas push -f hello-python.yml
+[0] > Pushing hello-python.
+The push refers to a repository [localhost:5000/hello-python]
+f6d500348258: Pushed
+df8a146b1da3: Layer already exists
+85269f63996d: Layer already exists
+e12a18f7076e: Layer already exists
+746defdaa29f: Layer already exists
+4fe6dc6d0808: Layer already exists
+5ac9550fccd9: Layer already exists
+aae31f4f40b2: Layer already exists
+88bb90ce2a55: Layer already exists
+f2e7d714d76b: Layer already exists
+efa0b7a2d37b: Layer already exists
+fe548f92b224: Layer already exists
+a7d53ea16e81: Layer already exists
+e53f74215d12: Layer already exists
+latest: digest: sha256:40bce13b998ec4d881dbc9270cdacdca4a4cd8ff28aacbb9152d5e98965a18a2 size: 3240
+[0] < Pushing hello-python done.
+[0] worker done.
+suda@kube01:~/hello-python$
+```
+
+続いて，OpenFaaSにデプロイします．
+コマンドを実行すると，自動的に既存のfunctionであることを検知し，ローリングアップデートの作業に入ります．
+
+```
+suda@kube01:~/hello-python$ faas deploy -f hello-python.yml
+Deploying: hello-python.
+Function hello-python already exists, attempting rolling-update.
+
+Deployed. 200 OK.
+URL: http://172.16.121.165:31112/function/hello-python
+
+suda@kube01:~/hello-python$
+```
+
+以上でデプロイが完了したはずなので，動作を確認してみましょう．
+
+```
+suda@kube01:~/hello-python$ echo -n "test" | faas-cli invoke --gateway http://172.16.121.165:31112 hello-python
+Welcome to OpenPaaS by Python
+test
+test
+suda@kube01:~/hello-python$
+```
+
+先程はstrと表示されてい箇所が，testになっているので，無事に更新が完了しました．
+
 
 ### Ingressへの登録
 
