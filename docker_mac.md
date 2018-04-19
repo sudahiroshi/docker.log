@@ -9,6 +9,7 @@ Docker for Mac
 ## Docker for Macとは
 
 macOS用のDockerです．
+そもそもDockerとは，ホストの環境を汚さずに，迅速かつ確実にアプリケーションを立ち上げるための技術で，PaaS業者であるDotCloud社が開発しました．
 元々DockerはLinux上でプロセスなどを隔離する仕組みから発展したものなので，基本的にLinux上でしか動作しません．
 macOS上で仮想化されたLinuxを動かし，その上でDockerを走らせるのがDocker for Macです．
 
@@ -48,12 +49,105 @@ Dockerのアイコンをクリックして，メニューから```Preference...`
 するとKubernetesをインストールして良いか尋ねられるので，```Install```をクリックします．
 暫く待つと，Kubernetesのインストールが完了します．
 
+## インストールされたソフトウェわの確認
+
+インストールされたソフトウェアを確認してみましょう．
+iterm2（コンソール）を開いて以下のように実行してみてください．
+
+```
+$ docker version
+Client:
+ Version:	18.04.0-ce
+ API version:	1.37
+ Go version:	go1.9.4
+ Git commit:	3d479c0
+ Built:	Tue Apr 10 18:13:16 2018
+ OS/Arch:	darwin/amd64
+ Experimental:	true
+ Orchestrator:	kubernetes
+
+Server:
+ Engine:
+  Version:	18.04.0-ce
+  API version:	1.37 (minimum version 1.12)
+  Go version:	go1.9.4
+  Git commit:	3d479c0
+  Built:	Tue Apr 10 18:23:05 2018
+  OS/Arch:	linux/amd64
+  Experimental:	true
+ Kubernetes:
+  Version:	v1.9.6
+  StackAPI:		v1beta1
+$
+```
+
+dockerコマンドがインストールされていることと，インストールされたDockerがVersion18.04.0-ceであることが確認できました．
+同様にkubernetesも確認してみましょう．
+
+```
+$ kubectl version
+Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.6", GitCommit:"9f8ebd171479bec0ada837d7ee641dec2f8c6dd1", GitTreeState:"clean", BuildDate:"2018-03-21T15:21:50Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"darwin/amd64"}
+Server Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.6", GitCommit:"9f8ebd171479bec0ada837d7ee641dec2f8c6dd1", GitTreeState:"clean", BuildDate:"2018-03-21T15:13:31Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/amd64"}
+$
+```
+
+kubectlコマンドがインストールされていることと，インストールされたKubernetesがVersion.1.9.6であることが確認できました．
+
 # Dockerを利用してサービスを立ち上げる．
 
-## まずはインタラクティブなコンテナを起動する
+## ```hello-world```コンテナを起動する
 
-Debian上に，別のディストリビューションのコンテナを起動します．
-ここでは，軽量なLinuxの一つであるalpineを起動し，シェルとして/bin/shを使用する．
+Dockerの動作を確認するために，```hello-world```と呼ばれるコンテナを起動してみましょう．
+コンテナとは，目的に応じてカスタマイズされた仮想計算機イメージのようなものです．
+使用するコマンドは```docker```です．
+
+
+|単語|意味|
+|-|-|
+|docker|dockerコマンド|
+|run|コンテナを実行|
+|hello-world|コンテナ名|
+
+初回は起動に時間がかかりますが，これはhello-worldのディスクイメージをダウンロードするためです．
+2回目以降の起動は高速です．
+以下のように表示されればきちんと動作しています．
+
+```
+$ docker run hello-world
+Unable to find image 'hello-world:latest' locally
+latest: Pulling from library/hello-world
+9bb5a5d4561a: Pull complete
+Digest: sha256:f5233545e43561214ca4891fd1157e1c3c563316ed8e237750d59bde73361e77
+Status: Downloaded newer image for hello-world:latest
+
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+
+To generate this message, Docker took the following steps:
+ 1. The Docker client contacted the Docker daemon.
+ 2. The Docker daemon pulled the "hello-world" image from the Docker Hub.
+    (amd64)
+ 3. The Docker daemon created a new container from that image which runs the
+    executable that produces the output you are currently reading.
+ 4. The Docker daemon streamed that output to the Docker client, which sent it
+    to your terminal.
+
+To try something more ambitious, you can run an Ubuntu container with:
+ $ docker run -it ubuntu bash
+
+Share images, automate workflows, and more with a free Docker ID:
+ https://hub.docker.com/
+
+For more examples and ideas, visit:
+ https://docs.docker.com/engine/userguide/
+
+$
+```
+
+## インタラクティブなコンテナを起動する
+
+ここでは，軽量なLinuxの一つであるalpineを起動し，仮想計算機のように使ってみましょう．
+そのために，/bin/shを使用します．
 
 |単語|意味|
 |-|-|
@@ -65,11 +159,11 @@ Debian上に，別のディストリビューションのコンテナを起動�
 
 
 ```
-suda@debian:~$ docker run -it alpine bin/sh
+$ docker run -it alpine /bin/sh
 Unable to find image 'alpine:latest' locally
 latest: Pulling from library/alpine
-2fdfe1cd78c2: Pull complete
-Digest: sha256:ccba511b1d6b5f1d83825a94f9d5b05528db456d9cf14a1ea1db892c939cda64
+ff3a5c916c92: Pull complete
+Digest: sha256:7df6db5aa61ae9480f52f0b3a06a140ab98d427f86d8d5de0bedab9b8df6b1c0
 Status: Downloaded newer image for alpine:latest
 / #
 ```
@@ -80,7 +174,8 @@ Status: Downloaded newer image for alpine:latest
 
 ```
 / # ls
-bin    dev    etc    home   lib    media  mnt    proc   root   run    sbin   srv    sys    tmp    usr    var
+bin    etc    lib    mnt    root   sbin   sys    usr
+dev    home   media  proc   run    srv    tmp    var
 / # ps
 PID   USER     TIME   COMMAND
     1 root       0:00 /bin/sh
@@ -103,15 +198,15 @@ lo        Link encap:Local Loopback
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 
 / # exit
-suda@debian:~$
+$
 ```
 
 このように，異なるOS環境下でコマンドを実行することができます．
 上記の例ではインタラクティブに/bin/shを起動しましたが，通常は非インタラクティブにサーバプログラムを動かします．
 
-## nginxを動かしてみる
+## Webサーバnginxを動かしてみる
 
-Dockerでは，様々なサービスのコンテナが[Docker Hub](https://hub.docker.com/)に用意されている．
+Dockerでは，様々なサービスのコンテナが[Docker Hub](https://hub.docker.com/)に用意されています．
 上記サイトを開いて，検索窓に```nginx```と入力すると，標準的な```nginx```に加え，Proxy用の```jwilder/nginx-proxy```なども用意されている．
 書式は```作者```/```コンテナ名```となっている．作者が無いものはDocker社が用意したコンテナである．
 
@@ -122,29 +217,27 @@ Dockerでは，様々なサービスのコンテナが[Docker Hub](https://hub.d
 |-|-|
 |docker|dockerコマンド|
 |run|コンテナを実行|
+|--rm|使い終わったコンテナを自動的に削除する|
 |--name nginx|起動しているコンテナ名をnginxとする|
 |-p 10080:80|debianの10080番ポートをコンテナの80番ポートにフォワードする|
 |-d|デーモン（裏で動くプロセス）として起動|
 |nginx|コンテナ名|
 
 ```
-suda@debian:~$ sudo docker run --name nginx -p 10080:80 -d nginx
-[sudo] suda のパスワード:
+$ docker run --rm --name nginx -p 10080:80 -d nginx
 Unable to find image 'nginx:latest' locally
 latest: Pulling from library/nginx
-e7bb522d92ff: Pull complete
-0f4d7753723e: Pull complete
-91470a14d63f: Pull complete
-Digest: sha256:25623adabe83582ed4261d975786627033a0a3a4f3656d784f6b9b03b0bc5010
+2a72cbf407d6: Pull complete
+04b2d3302d48: Pull complete
+e7f619103861: Pull complete
+Digest: sha256:18156dcd747677b03968621b2729d46021ce83a5bc15118e5bcced925fb4ebb9
 Status: Downloaded newer image for nginx:latest
-33328468f5b95512323a0c81f53e27b6a2b4b3a292a5ad7fb0b5f928b4624e2c
-suda@debian:~$ sudo docker ps
-CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                NAMES
-33328468f5b9        nginx               "nginx -g 'daemon ..."   28 seconds ago      Up 27 seconds       0.0.0.0:80->80/tcp   nginx
-suda@debian:~$
+393917b4e58fdc51693f7dad3183e20b15edbb6112ffb6f89c86e6ada6fe5134
+$
 ```
 
 ブラウザから```http://localhost:10080```にアクセスすると，```Welcome to nginx!```の画面が表示されるはずである．
+これは，nginxの標準的な初期画面です．
 
 ### 起動中のコンテナを確認する．
 
