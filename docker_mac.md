@@ -341,7 +341,7 @@ Webサーバだけでは，サービスを起動した感じがしないので�
 
 ```
 $ mkdir -p gogs
-$ sudo docker run --name gogs -d --rm -p 3000:3000 -v /home/suda/gogs:/data gogs/gogs
+$ docker run --name gogs -d --rm -p 3000:3000 -v /home/suda/gogs:/data gogs/gogs
 Unable to find image 'gogs/gogs:latest' locally
 latest: Pulling from gogs/gogs
 b1f00a6a160c: Pull complete
