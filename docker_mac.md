@@ -208,10 +208,9 @@ $
 
 Dockerでは，様々なサービスのコンテナが[Docker Hub](https://hub.docker.com/)に用意されています．
 上記サイトを開いて，検索窓に```nginx```と入力すると，標準的な```nginx```に加え，Proxy用の```jwilder/nginx-proxy```なども用意されている．
-書式は```作者```/```コンテナ名```となっている．作者が無いものはDocker社が用意したコンテナである．
+書式は```作者```/```コンテナ名```となっていて，例外として作者が無いものはDocker社が用意したコンテナです．
 
 それでは実際にnginxを起動してみよう．
-ここでは，VirtualBoxの設定で，ホストOS側の10080番ポートをゲストOSの10080番ポートにフォワードするよう設定してあるものとする．
 
 |単語|意味|
 |-|-|
@@ -237,16 +236,16 @@ $
 ```
 
 ブラウザから```http://localhost:10080```にアクセスすると，```Welcome to nginx!```の画面が表示されるはずである．
-これは，nginxの標準的な初期画面です．
+これは，nginxの標準的な初期画面で，とりあえずこの画面が見られれば起動は成功しているという目安です．
 
 ### 起動中のコンテナを確認する．
 
 
 ```
-suda@debian:~$ sudo docker ps
+$ docker ps
 CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                   NAMES
 59f68787f964        nginx               "nginx -g 'daemon ..."   6 seconds ago       Up 6 seconds        0.0.0.0:10080->80/tcp   nginx
-suda@debian:~$
+$
 ```
 
 ここで，NAMESの項目にnginxという文字列が入っているのは，起動時に```--name nginx```として指定したことによる．
@@ -257,43 +256,57 @@ suda@debian:~$
 ### コンテナを止める．
 
 ```
-suda@debian:~$ sudo docker stop nginx
+$ docker stop nginx
 nginx
-suda@debian:~$
+$
 ```
 
 ### コンテナを削除する
 
-コンテナを止めただけでは残骸が残っているので，残骸を削除する．
+コンテナ起動時に```--rm```オプションを付けていれば残骸は残らないが，このオプションを付けなかった場合このオプションを付けなかった場合はコンテナを止めただけでは残骸が残っているので，残骸を削除する．
 残っている理由は，残骸を再度コンテナ化して利用するためである．
-起動時に```--rm```オプションを付けておけば，この作業は不要である．
+通常は```--rm```オプションを付けることを推奨する．
 
 ```
-suda@debian:~$ sudo docker rm nginx
+$ docker rm nginx
 nginx
-suda@debian:~$
+$
 ```
 
 ### Webページのデータを差し替える
 
-ここでは，debianの```/home/suda/html```というディレクトリを作り，その中にWebページのデータ（index.htmlなど）が有るものとする．
-さて，肝心のnginxコンテナ内のWebページのデータの在り処であるが，Debian9にnginxパッケージをインストールした場合は```/var/www/html```であった．
-これに対してnginxコンテナでは，```/usr/share/nginx/html```に置かれている．
-これを踏まえた上で，```/home/suda/html```をマウントさせて実行する．
+ここでは，macOSの```/Users/suda/html```というディレクトリを作り，その中にWebページのデータ（index.htmlなど）が有るものとする．
+さて，肝心のnginxコンテナ内のWebページのデータは```/usr/share/nginx/html```に置かれることになっている．
+そこで，```/Users/suda/html```を```/usr/share/nginx/html```にマウントさせて実行する．
+
+※ユーザ名が```suda```である前提で書いています．自分のユーザ名に置き換えてください．
 
 増えたオプションは以下の通り
 
 |単語|意味|
 |-|-|
-|--rm|停止時に残骸を自動的に削除|
 |-v /home/suda/html:/usr/hsare/nginx/html|コロンよりも前のディレクトリをコンテナ内のコロン以後のディレクトリにディレクトリにマウント|
 
 この状態でWebブラウザから```http://localhost:10080```にアクセスすると，Webページの内容が変わっているはずである．
 
 ```
-suda@debian:~$ sudo docker run --name nginx -p 10080:80 -d --rm -v /home/suda/html:/usr/share/nginx/html nginx
+$ mkdir html
+$ cd html
+$ cat > index.html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>Example of nginx powered by Docker</title>
+</head>
+<body>
+  <p>Hello World</p>
+</body>
+</html>
+^d // ←ctrl + dを押す
+$ docker run --name nginx -p 10080:80 -d --rm -v /Users/suda/html:/usr/share/nginx/html nginx
 75084fd62965e183aa915f719d017fbde45ff7e17783244eac8878bba46309e5
-suda@debian:~$
+$
 ```
 
 ### コンテナにログインしたい
@@ -307,7 +320,8 @@ suda@debian:~$
 具体的には，コンテナを停止・残骸を削除した状態で，以下のように起動すれば良い．
 
 ```
-suda@debian:~$ sudo docker run --name nginx -p 10080:80 --rm -it -v /home/suda/html:/var/www/html nginx /bin/bash
+// コンテナを止めて・残骸を削除してから以下を実行
+$ docker run --name nginx -p 10080:80 --rm -it -v /home/suda/html:/var/www/html nginx /bin/bash
 root@ddfec24dff54:/# ls
 bin  boot  dev	etc  home  lib	lib64  media  mnt  opt	proc  root  run  sbin  srv  sys  tmp  usr  var
 root@ddfec24dff54:/#
@@ -326,8 +340,8 @@ Webサーバだけでは，サービスを起動した感じがしないので�
 
 
 ```
-suda@debian:~$ mkdir -p gogs
-suda@debian:~$ sudo docker run --name gogs -d --rm -p 3000:3000 -v /home/suda/gogs:/data gogs/gogs
+$ mkdir -p gogs
+$ sudo docker run --name gogs -d --rm -p 3000:3000 -v /home/suda/gogs:/data gogs/gogs
 Unable to find image 'gogs/gogs:latest' locally
 latest: Pulling from gogs/gogs
 b1f00a6a160c: Pull complete
@@ -381,18 +395,18 @@ volumeとは，コンテナに依存しない，独立したディスクとい�
 
 
 ```
-suda@debian:~$ sudo docker volume create --name data
+$ docker volume create --name data
 data
-suda@debian:~$
+$
 ```
 
 上記で作成したvolumeを使用して，gogsを起動します．
 オプションの```-v data:/data```がvolume名dataを/dataにマウントして使用することを表します．
 
 ```
-suda@debian:~$ sudo docker run --name gogs --rm -p 3000:3000 -d -v data:/data gogs/gogs
+$ docker run --name gogs --rm -p 3000:3000 -d -v data:/data gogs/gogs
 3889c7df63b33e2eb669d6e298f134b4c75376d1a0b37ccde68f5bd1696db72e
-suda@debian:~$
+$
 ```
 
 ## Dockerfileを覗いてみる
@@ -430,344 +444,126 @@ gogsコンテナは```alpine:3.5```というイメージを基に，```ADD```や
 基となるイメージは，たいていalpineやDebianが使われている．
 Debianの場合は，バージョンを表すコード名が用いられるので，最新版なら```stretch```と書かれている．
 
-## 複数のサービスの連携
+## オーケストレーションツール
 
 単独のサービスとして，nginxやGogsを立ち上げてみた．
-本来，これらのサービスは連携させて運用することが普通である．
-Gogsだけ見ても，本来はGogsとDBMSを連携させるべきである．
+本来，これらのサービスは連携させて運用したり，大規模なサービスの場合は複数のWebサーバを起動させる．
+大規模になると，万一エラーなどでサービスが停止してしまった場合に再起動が必要になったり，ソフトウェアの更新のために1つ1つコンテナを停止してアップデートするなどの煩わしい作業が出てくる．
+これらを手作業で行っていたら，とても間に合わないしミスが発生してしまうので自動化が必要になる．
 
 このような場合はDockerfileだけでは記述できないので，複数のサービスを連携させて立ち上げる仕組みが必要となる．
 実際に，```オーケストレーションツール```という名前で，幾つかの実装が存在する．
 Docker標準では```Docker Compose```と```Swarm```いう仕組みが用意されており，他にも```Kubernetes```や```Cattle```などが存在している．
 
-使うべきオーケストレーションツールは，今のところKubernetesが最適と言われている．
+使うべきオーケストレーションツールは，今のところKubernetesが最有力である．．
 これは，クラウド環境下でコンテナを運用するための様々な仕組みが用意されており，それらと連携を図る際に都合が良いからである．
-とは言え，Kubernetesの環境構築は色々と厄介なので，ここではDocker Composeを取り上げる．
-GoogleやAmazonのクラウド環境を使える立場であれば，迷わずKubernetesを使用するべきであるが動作を理解するためにはDocker Composeの方が適しているためである。
+それではKubernetesを使って，サービスを立ち上げてみよう．
 
-### Docker Composeのインストール
+### KubernetesでGogsを立ち上げる
 
-まずはDocker Composeをインストールします．
-apt-getコマンドでもインストールできるようですが，多数のパッケージに依存していてディスク容量を使ってしますので，公式で配布されているバイナリをダウンロードします．
-執筆時の最新バージョンは1.18.0のようです．
-
-
-```
-suda@debian:~$ sudo curl -L https://github.com/docker/compose/releases/download/1.18.0/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-100   617    0   617    0     0    714      0 --:--:-- --:--:-- --:--:--   714
-100 8280k  100 8280k    0     0  1664k      0  0:00:04  0:00:04 --:--:-- 2143k
-suda@debian:~$ sudo chmod +x /usr/local/bin/docker-compose
-suda@debian:~$ sudo docker-compose --version
-docker-compose version 1.18.0, build 8dd22a9
-suda@debian:~$
-```
-
-### Docker ComposeによるGogsのインストール
-
-それでは早速Docker Composeを使ってみましょう．
+それでは早速Kubernetesを使ってみましょう．
 その前に，これまでDockerを使って起動していたサービスを全て停止させておいてください．
-また，ポートフォワードが3000→3000になっているものとして話を進めます．
 
-ここでは，先程インストールしたGogsを，Docker Composeを利用してインストールしてみます．
-と言っても先ほどと同じではつまらないので，今回はDBMSと連携させてみましょう．
-以下のURLの設定ファイルを使用します．
+Kubernetesを使う場合，コマンドを順次入力してインストールを行うのではなく，設定ファイルを用意することになります．
+設定ファイルのフォーマットは通常はYAMLが用いられ，その項目はいくつかの分野に分割されている．
+とりあえず必要な分野を以下に示します．
+これらを1つのファイルにまとめて定義することも可能ですし，複数のファイルに分割する弧も可能です．
 
-[ahromis/docker-compose.yml](https://gist.github.com/ahromis/4ce4a58623847ca82cb1b745c2f83c82)
+分野名 | 内容
+-|-
+deployment | 複数のコンテナを起動したり世代管理する
+service | 複数のコンテナへのアクセスを仲介する
+ingress | 外部のロードバランサに公開するURLなどを指定する
 
-Docker Composeの基本事項ですが，設定ファイルは```docker-compose.yml```という名前です．
-拡張子に表れているように，YAMLフォーマットです．
+それでは，Gogsを起動するための最低限の設定ファイルを示します．
+ここでは，分かりやすくするために分野ごとに3つの設定ファイルを用意するものとします．
 
-以下のようにダウンロードします．
+まずはdeployment.yamlです．
+最後の行は，設定ファイルを置くディレクトリの指定で，通常はこのような直接的な書き方はせずに，クラウド業者の用意したサービスを使用します．
 
-```
-suda@debian:~$ curl -L https://gist.githubusercontent.com/ahromis/4ce4a58623847ca82cb1b745c2f83c82/raw/31e8ced3d7e08c602a1c0ca8994c063994971c7f/docker-compose.yml -o docker-compose.yml
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-100   732  100   732    0     0   2039      0 --:--:-- --:--:-- --:--:--  2044
-suda@debian:~$ ls
-docker-compose.yml
-suda@debian:~$
-```
-
-以下に内容を示します．
-大雑把に解説しておくと，```services```で起動するプログラムに関することを，```networkds```でネットワークに関することを，```volumes```でデータコンテナに関することを設定しています．
-この中で```services```では，```postgres```と```gogs```というプログラムを起動することが書かれています．
-また```networks```では，```gogs```という名前のネットワークを作っています．
-さらに```volume```では，```db-data```と```gogs-data```を作っています．
-また，```${```と```}```で囲まれた部分は，docker-compose実行時に環境変数で値を渡す部分です．
 
 ```
-version: '2'
-services:
-    postgres:
-      image: postgres:9.5
-      restart: always
-      environment:
-       - "POSTGRES_USER=${POSTGRES_USER}"
-       - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
-       - "POSTGRES_DB=gogs"
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: gogs
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: gogs
+    spec:
+      containers:
+      - resources:
+        name: gogs
+        image: gogs/gogs
+        ports:
+        - name: gogs-port
+          containerPort: 3000
+        volumeMounts:
+        - mountPath: /data
+          name: data
       volumes:
-       - "db-data:/var/lib/postgresql/data"
-      networks:
-       - gogs
-    gogs:
-      image: gogs/gogs:latest
-      restart: always
-      ports:
-       - "10022:22"
-       - "3000:3000"
-      links:
-       - postgres
-      environment:
-       - "RUN_CROND=true"
-      networks:
-       - gogs
-      volumes:
-       - "gogs-data:/data"
-      depends_on:
-       - postgres
-
-networks:
-    gogs:
-      driver: bridge
-
-volumes:
-    db-data:
-      driver: local
-    gogs-data:
-      driver: local
+      - name: data
+        hostPath:
+          path: /Users/suda/gogs/data
 ```
 
-それでは起動してみましょう．
-先に述べたように，起動時に環境変数を通じて値をセットしつつ，docker-composeを実行します．
-ここでは，PostgreSQLのユーザ名として```postgres```を，そのユーザのパスワードとして```sudasuda```を指定しています．
-試したところ，ユーザ名はpostgresでないときちんと使えませんでした．
-パスワードは各自設定してください．
+次に，service.yamlです．
 
 ```
-suda@debian:~$ sudo POSTGRES_USER=postgres POSTGRES_PASSWORD=sudasuda docker-compose up
-Creating network "temp_gogs" with driver "bridge"
-Creating volume "temp_db-data" with local driver
-Creating temp_postgres_1 ... done
-Creating temp_postgres_1 ...
-Creating temp_gogs_1     ... done
-Attaching to temp_postgres_1, temp_gogs_1
-postgres_1  | The files belonging to this database system will be owned by user "postgres".
-postgres_1  | This user must also own the server process.
-postgres_1  |
-postgres_1  | The database cluster will be initialized with locale "en_US.utf8".
-postgres_1  | The default database encoding has accordingly been set to "UTF8".
-postgres_1  | The default text search configuration will be set to "english".
-postgres_1  |
-postgres_1  | Data page checksums are disabled.
-postgres_1  |
-postgres_1  | fixing permissions on existing directory /var/lib/postgresql/data ... ok
-postgres_1  | creating subdirectories ... ok
-postgres_1  | selecting default max_connections ... 100
-postgres_1  | selecting default shared_buffers ... 128MB
-postgres_1  | selecting dynamic shared memory implementation ... posix
-postgres_1  | creating configuration files ... ok
-gogs_1      | usermod: no changes
-gogs_1      | init:crond  | Cron Daemon (crond) will be run as requested by s6
-gogs_1      | Jan 10 12:04:05 syslogd started: BusyBox v1.25.1
-gogs_1      | Jan 10 12:04:06 sshd[32]: Server listening on :: port 22.
-gogs_1      | Jan 10 12:04:06 sshd[32]: Server listening on 0.0.0.0 port 22.
-postgres_1  | creating template1 database in /var/lib/postgresql/data/base/1 ... ok
-postgres_1  | initializing pg_authid ... ok
-postgres_1  | initializing dependencies ... ok
-postgres_1  | creating system views ... ok
-postgres_1  | loading system objects' descriptions ... ok
-postgres_1  | creating collations ... ok
-postgres_1  | creating conversions ... ok
-postgres_1  | creating dictionaries ... ok
-postgres_1  | setting privileges on built-in objects ... ok
-postgres_1  | creating information schema ... ok
-postgres_1  | loading PL/pgSQL server-side language ... ok
-postgres_1  | vacuuming database template1 ... ok
-postgres_1  | copying template1 to template0 ... ok
-postgres_1  | copying template1 to postgres ... ok
-postgres_1  | syncing data to disk ... ok
-postgres_1  |
-postgres_1  | WARNING: enabling "trust" authentication for local connections
-postgres_1  | You can change this by editing pg_hba.conf or using the option -A, or
-postgres_1  | --auth-local and --auth-host, the next time you run initdb.
-postgres_1  |
-postgres_1  | Success. You can now start the database server using:
-postgres_1  |
-postgres_1  |     pg_ctl -D /var/lib/postgresql/data -l logfile start
-postgres_1  |
-postgres_1  | waiting for server to start....LOG:  could not bind IPv6 socket: Cannot assign requested address
-postgres_1  | HINT:  Is another postmaster already running on port 5432? If not, wait a few seconds and retry.
-postgres_1  | LOG:  database system was shut down at 2018-01-10 12:04:06 UTC
-postgres_1  | LOG:  MultiXact member wraparound protections are now enabled
-postgres_1  | LOG:  database system is ready to accept connections
-postgres_1  | LOG:  autovacuum launcher started
-postgres_1  |  done
-postgres_1  | server started
-postgres_1  | CREATE DATABASE
-postgres_1  |
-postgres_1  | ALTER ROLE
-postgres_1  |
-postgres_1  |
-postgres_1  | /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
-postgres_1  |
-postgres_1  | LOG:  received fast shutdown request
-postgres_1  | LOG:  aborting any active transactions
-postgres_1  | LOG:  autovacuum launcher shutting down
-postgres_1  | LOG:  shutting down
-postgres_1  | waiting for server to shut down....LOG:  database system is shut down
-postgres_1  |  done
-postgres_1  | server stopped
-postgres_1  |
-postgres_1  | PostgreSQL init process complete; ready for start up.
-postgres_1  |
-postgres_1  | LOG:  database system was shut down at 2018-01-10 12:04:09 UTC
-postgres_1  | LOG:  MultiXact member wraparound protections are now enabled
-postgres_1  | LOG:  database system is ready to accept connections
-postgres_1  | LOG:  autovacuum launcher started
-gogs_1      | 2018/01/10 12:04:17 [ WARN] Custom config '/data/gogs/conf/app.ini' not found, ignore this if you're running first time
-gogs_1      | 2018/01/10 12:04:17 [TRACE] Custom path: /data/gogs
-gogs_1      | 2018/01/10 12:04:17 [TRACE] Log path: /app/gogs/log
-gogs_1      | 2018/01/10 12:04:17 [TRACE] Build Time: 2017-11-22 08:19:49 UTC
-gogs_1      | 2018/01/10 12:04:17 [TRACE] Build Git Hash:
-gogs_1      | 2018/01/10 12:04:17 [TRACE] Log Mode: Console (Trace)
-gogs_1      | 2018/01/10 12:04:17 [ INFO] Gogs 0.11.34.1122
-gogs_1      | 2018/01/10 12:04:17 [ INFO] Cache Service Enabled
-gogs_1      | 2018/01/10 12:04:17 [ INFO] Session Service Enabled
-gogs_1      | 2018/01/10 12:04:17 [ INFO] SQLite3 Supported
-gogs_1      | 2018/01/10 12:04:17 [ INFO] Run Mode: Development
-gogs_1      | 2018/01/10 12:04:17 [ INFO] Listen: http://0.0.0.0:3000
+apiVersion: v1
+kind: Service
+metadata:
+  name: gogs
+  labels:
+    name: gogs
+spec:
+  ports:
+  - port: 3000
+    targetPort: 3000
+  selector:
+    name: gogs
+  type: LoadBalancer
 ```
 
-起動したら，Webブラウザから接続してみてください．
-接続先は[http://localhost:3000/](http://localhost:3000/)です．
-
-すると，インストールするための設定画面が表れます．
-先頭にある「データベース設定」には以下のように入力してください．
-
-項目 | 内容 | コメント
---|--|--
-データベースの種類 | PostgreSQL | DBと連携します
-ホスト | postgres | ポート番号は不要です
-ユーザ | postgres | rootでは連携できませんでした
-パスワード | sudasuda | 各自環境変数に設定したものを入力してください
-データベース名 | gogs | ここは変えないでください
-SSLモード | Disable | ここも変えないでください
-
-それ以降の項目は特に変更する必要はありません．
-念のため，HTTPポートは3000番になっていることを確認しておいてください．
-
-スペルミスなどがないか確認したら，一番下の「Gogsをインストール」をクリックしてください．
-サインイン画面になるので，「アカウントが必要ですか？今すぐ登録しましょう！」をクリックします．
-
-ユーザ名などを適当（適切という意味）に入力して「新規アカウントを作成」をクリックしてください．
-ログイン画面が出てくるので，再度IDとパスワードを入力してください．
-
-以上でPostgreSQLと連携したGogsを使えるようになります．
-
-## docker-compose.ymlを詳しく見てみる
-
-### バージョン
-それでは設定ファイルを詳しく見ていきましょう．
-まずは設定ファイルのフォーマットバージョンです．
-現在の最新フォーマットはバージョン3ですが，ここではバージョン2を使っています．
-参考までに，バージョンは2.1，2.2など小数点以下まで指定することができます．
-バージョンごとの詳しい説明は[Compose file versions and upgrading](https://docs.docker.com/compose/compose-file/compose-versioning/#version-34)を読んで下さい．
-
-```
-version: '2'
-```
-
-### 第1層の設定項目
-続く項目は，サービス設定，ボリューム設定，ネットワーク設定です．
-以下のようになっています．
-
-項目 | 意味 | 説明
--|-|-
-services | サービス設定 | 実際に動かすコンテナに関する設定
-networks | ネットワーク設定 | コンテナ間のネットワークを宣言する
-volumes | ボリューム設定 | ボリュームコンテナを宣言する
-
-### networks
-
-まずはnetworksから見ていきましょう．
-以下の例では，```gogs```という名前のネットワークを宣言しています．
-ここでは1つだけ宣言していますが，複数個のネットワークを宣言してコンテナ毎にネットワークを分けることも可能です．
-その次にある```dirver```の項目ですが，この設定ファイルでは```bridge```となっています．
-これは，各コンテナが同一のホスト上で実行されていることを想定しています．
-複数のホスト上にコンテナを分散したい場合は，```overlay```を指定するのですが，これには```Docker Swarm```という別の仕組みが必要となります．
+最後にingress.yamlです．
 
 
 ```
-networks:
-    gogs:
-      driver: bridge
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: gogs
+spec:
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: gogs
+          servicePort: 3000
 ```
 
-### volumes
-
-続いて```volumes```です．
-以下の例では，```db-data```というボリュームと```gogs-data```というボリュームを宣言しています．
-名前から想像できると思いますが，PostgreSQLのデータを保存しておくボリュームと，Gogsのデータを保存しておくボリュームです．
-それぞれ```driver```の項目に```local```が設定されていますが，文字通りホスト上のローカルストレージを使用することを示しています．
-この場合，複数のホスト上にコンテナを分散したい場合に支障が出るため，クラウド上で本格的に運用する場合はボリュームプラグインという仕組みを使用して，NFSやCIFS（Windowsのファイル共有の仕組み），各種クラウドの用意している分散ストレージなど使うことが一般的です．
+ingress.yamlのspec.rules.hostの項目は，通常はきちんとしたホスト名を書きます．
+ただし，きちんとしたホスト名を付けるためには，DNSサーバが必要になります．
+簡易的に使いたいのであれば，以下のように書くことでlocalhost以外からでもアクセスできるようになります．
+（IPアドレスが172.16.121.101の場合の例）
+具体的には，[gogs.172.16.121.101.nip.io](http://gogs.172.16.121.101.nip.io)にアクセスすれば，他のコンピュータからも利用できます．
 
 ```
-volumes:
-    db-data:
-      driver: local
-    gogs-data:
-      driver: local
+  - host: gogs.172.16.121.101.nip.io
 ```
 
-### services
+実際にインターネット上のサービスを立ち上げる際には，HTTPは80番ポートで提供することになります．
+自前で複数のサービスを提供する場合，Ingressの仕組みを使ってホスト名でサービスを分けると便利です．
 
-最後に```services```です．
-第2回想を見ると，```postgres```と```gogs```という2つのサービスを動かそうとしていることが分かります．
-ですので，まずはそれぞれのサービスを分けて考えます．
+## 研究室内での利用方法
 
-項目 | 説明
--|-|-
-image | 使用するDockerイメージを指定する
-restart | 何か有った場合に再起動するか指定する（no / always / no-failure）
-ports | 外部からアクセスできるポート番号と内部で使用するポート番号を指定する
-links | 指定したコンテナと通信することを示す
-environment | コンテナの環境変数を設定する
-volumes | マウントするファイルシステムを指定する
-networkds | 使用するネットワークを指定する
-depends_on | 指定しているコンテナが起動するのを待ってから起動する
+研究テーマを探している際に，ふとサービスを立ち上げてみたくなることがあります．
+そのようなときに，Dockerイメージが公開されているか確認しましょう．
+もし公開されていれば，たいてい起動方法も一緒に公開されているので，使ってみましょう．
 
-
-
-```
-services:
-    postgres:
-      image: postgres:9.5
-      restart: always
-      environment:
-       - "POSTGRES_USER=${POSTGRES_USER}"
-       - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
-       - "POSTGRES_DB=gogs"
-      volumes:
-       - "db-data:/var/lib/postgresql/data"
-      networks:
-       - gogs
-    gogs:
-      image: gogs/gogs:latest
-      restart: always
-      ports:
-       - "10022:22"
-       - "3000:3000"
-      links:
-       - postgres
-      environment:
-       - "RUN_CROND=true"
-      networks:
-       - gogs
-      volumes:
-       - "gogs-data:/data"
-      depends_on:
-       - postgres
-```
+さらに進んで，外部に公開したくなったら，GoogleやAmazon，MicrosoftのKubernetes as a Serviceを使って公開すると便利です．
