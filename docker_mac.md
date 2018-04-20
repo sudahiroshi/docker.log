@@ -547,18 +547,119 @@ spec:
           servicePort: 3000
 ```
 
-ingress.yamlのspec.rules.hostの項目は，通常はきちんとしたホスト名を書きます．
-ただし，きちんとしたホスト名を付けるためには，DNSサーバが必要になります．
-簡易的に使いたいのであれば，以下のように書くことでlocalhost以外からでもアクセスできるようになります．
-（IPアドレスが172.16.121.101の場合の例）
-具体的には，[gogs.172.16.121.101.nip.io](http://gogs.172.16.121.101.nip.io)にアクセスすれば，他のコンピュータからも利用できます．
+それでは起動してみましょう．
+上記3つのファイルをコピー＆ペーストして同じディレクトリに置いてください．
+準備が整ったら以下のように実行します．
 
 ```
+$ kubectl apply -f ./
+deployment "gogs" created
+ingress "gogs" created
+service "gogs" created
+$
+```
+
+この状態で，```http://localhost:3000/```にアクセスするとGogsを利用できます．
+停止するには以下のように実行します．
+
+```
+$ kubectl delete -f ./
+deployment "gogs" deleted
+ingress "gogs" deleted
+service "gogs" deleted
+$
+```
+
+## Ingressを使ってサービスを公開する
+
+ここまでできたら，他のホストからもアクセスしてみたくなりますよね？
+その場合，複数のサービスを80番ポートで公開したいとなると，頭の痛い作業が必要となっていました．
+Kuberneteは，そのような問題にも対処可能で，その仕組はIngressと名付けられています．
+また，ingress.yaml内のingress.yamlのspec.rules.hostの項目は，通常はきちんとしたホスト名を書くことができます．
+
+そのために，Ingress Controllerを立ち上げてみましょう．
+
+```
+$ kubectl create -f https://raw.githubusercontent.com/jcmoraisjr/haproxy-ingress/master/docs/haproxy-ingress.yaml
+namespace "ingress-controller" created
+serviceaccount "ingress-controller" created
+clusterrole "ingress-controller" created
+role "ingress-controller" created
+clusterrolebinding "ingress-controller" created
+rolebinding "ingress-controller" created
+deployment "ingress-default-backend" created
+service "ingress-default-backend" created
+configmap "haproxy-ingress" created
+daemonset "haproxy-ingress" created
+$
+```
+
+ここで1つ問題があります．きちんとしたホスト名を付けるためには，DNSサーバが必要になります．
+この問題に対して，簡易的に使いたいのであればnip.ioというサービスが有るのでこれを利用します．
+nip.ioとは，```IPアドレス.nip.io```というホスト名をIPアドレスに紐付けてくれるサービスです．
+IPアドレスが172.16.121.101の場合，172.16.121.101.nip.ioというホスト名が利用できます．
+また，そのホスト名の前に好きな名前をつけることも可能です．
+例えば，gogs.172.16.121.101.nip.ioのような名前でもアクセスできます．
+よって，複数のサービスをホスト名で使い分けることができます．
+
+それでは，80番ポートで公開すべく設定ファイルを書き換えてみましょう．
+
+deployment.yamlはそのままで良いです．
+service.yamlを以下のように書き換えてください．
+具体的には9行目を3000から80にします．
+
+
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: gogs
+  labels:
+    name: gogs
+spec:
+  ports:
+  - port: 80
+    targetPort: 3000
+  selector:
+    name: gogs
+  type: LoadBalancer
+```
+
+続いてingress.yamlを以下のように書き換えます．
+以下は例なので7行目のhostの項目は各自のIPアドレスを含むホスト名に変えてください．
+ついでに最終行のservicePortを80にします．
+
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: gogs
+spec:
+  rules:
   - host: gogs.172.16.121.101.nip.io
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: gogs
+          servicePort: 80
 ```
 
-実際にインターネット上のサービスを立ち上げる際には，HTTPは80番ポートで提供することになります．
-自前で複数のサービスを提供する場合，Ingressの仕組みを使ってホスト名でサービスを分けると便利です．
+上記のように変更したら，設定ファイルを反映させます．
+Kubernetesを使っている場合，一度止めて立ち上げるといったことは必要ありません．
+以下のように実行します．
+
+
+```
+$ kubectl apply -f ./
+deployment "gogs" unchanged
+ingress "gogs" configured
+service "gogs" configured
+$
+```
+
+applyは，サービスの起動のためのサブコマンドですが，変更された設定ファイルの反映という意味も持っています．
+このように，自前で複数のサービスを提供する場合，Ingressの仕組みを使ってホスト名でサービスを分けると便利です．
 
 ## 研究室内での利用方法
 
@@ -566,4 +667,5 @@ ingress.yamlのspec.rules.hostの項目は，通常はきちんとしたホス�
 そのようなときに，Dockerイメージが公開されているか確認しましょう．
 もし公開されていれば，たいてい起動方法も一緒に公開されているので，使ってみましょう．
 
+その後，サービスを活用したくなったらKubernetesを利用してサービスを研究室内で公開しましょう．
 さらに進んで，外部に公開したくなったら，GoogleやAmazon，MicrosoftのKubernetes as a Serviceを使って公開すると便利です．
