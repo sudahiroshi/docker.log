@@ -285,7 +285,7 @@ $
 
 |単語|意味|
 |-|-|
-|-v /home/suda/html:/usr/hsare/nginx/html|コロンよりも前のディレクトリをコンテナ内のコロン以後のディレクトリにディレクトリにマウント|
+|-v /Users/suda/html:/usr/hsare/nginx/html|コロンよりも前のディレクトリをコンテナ内のコロン以後のディレクトリにディレクトリにマウント|
 
 この状態でWebブラウザから```http://localhost:10080```にアクセスすると，Webページの内容が変わっているはずである．
 
@@ -321,7 +321,7 @@ $
 
 ```
 // コンテナを止めて・残骸を削除してから以下を実行
-$ docker run --name nginx -p 10080:80 --rm -it -v /home/suda/html:/var/www/html nginx /bin/bash
+$ docker run --name nginx -p 10080:80 --rm -it -v /Users/suda/html:/var/www/html nginx /bin/bash
 root@ddfec24dff54:/# ls
 bin  boot  dev	etc  home  lib	lib64  media  mnt  opt	proc  root  run  sbin  srv  sys  tmp  usr  var
 root@ddfec24dff54:/#
@@ -341,7 +341,7 @@ Webサーバだけでは，サービスを起動した感じがしないので�
 
 ```
 $ mkdir -p gogs
-$ docker run --name gogs -d --rm -p 3000:3000 -v /home/suda/gogs:/data gogs/gogs
+$ docker run --name gogs -d --rm -p 3000:3000 -v /Users/suda/gogs:/data gogs/gogs
 Unable to find image 'gogs/gogs:latest' locally
 latest: Pulling from gogs/gogs
 b1f00a6a160c: Pull complete
