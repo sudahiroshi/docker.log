@@ -28,7 +28,7 @@ $ sudo swapoff /dev/sda5
 ## 起動順序
 
 ```
-$ kubeadm reset
+$ sudo kubeadm reset
 $ sudo kubeadm init --pod-network-cidr=10.244.0.0/16
 $ sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 $ sudo chown $(id -u):$(id -g) $HOME/.kube/config
