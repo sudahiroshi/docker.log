@@ -252,12 +252,7 @@ $
 Deploymentの詳細
 
 ```
-$ kubectl get deployment
-NAME    DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-nginx   3         3         3            3           20m
-suda@debian:~$ kubectl describe nginx
-error: the server doesn't have a resource type "nginx"
-suda@debian:~$ kubectl describe deployment nginx
+$ kubectl describe deployment nginx
 Name:                   nginx
 Namespace:              default
 CreationTimestamp:      Mon, 15 Oct 2018 15:49:50 +0900
