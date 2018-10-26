@@ -341,6 +341,205 @@ nginx-5c689d88bb-vvmgr   1/1     Running   1          24m
 nginx-5c689d88bb-z5tsx   1/1     Running   0          24m
 ```
 
+### 各自のコンテンツを配信するWebサーバを立ち上げる
+
+次に，独自コンテンツを配信するWebサーバを立ち上げてみよう．
+これにはいくつかのやり方があるのだが，動作の仕組みが簡単になるように，コンテンツ込みのDockerイメージを作る方法を採用する．
+ところで，Kubernetesで起動するDockerイメージは，Registryに置いてあるものをダウンロードして使用する．
+RegistryとしてDockerHubを使うのが最も手っ取り早いが，ユーザ登録が必要なため，ここではローカルRegistryを立ち上げて使用する方法を採用する．
+
+### ローカルRegistyを立ち上げる
+
+単独のホストからのみアクセスできるRegistryを起動してみよう．
+なお，本来は複数のホストからアクセスすることが前提となっている（そもそもKubernetesはクラスタ上で使う）ので，あくまでお試し or 練習用となる．
+次のように5000番ポートで立ち上げてみよう．
+
+```
+$ sudo docker run -d -p 5000:5000 --name registry registry:2
+f29c3e83f120d509042a9ae6afc93da17c94c8a78b9948deb5c24197ee120565
+$
+```
+
+起動確認は以下のようにする．
+
+```
+$ sudo docker ps | grep registry
+f29c3e83f120        registry:2                           "/entrypoint.sh /etc…"   2 minutes ago          Up 2 minutes           0.0.0.0:5000->5000/tcp   registry
+$
+```
+
+### nginxをRegistryに登録する
+
+Registryへの登録は，Dockerイメージのダウンロード or Dockerイメージの作成 →　タグ付け　→　Registryへのpushの順に行う．
+ここでは，単純にダウンロードしたイメージをそのままRegistryに登録する手順を学習する．
+
+まずはDockerイメージのダウンロード．
+
+```
+$ sudo docker pull nginx
+Using default tag: latest
+latest: Pulling from library/nginx
+Digest: sha256:b73f527d86e3461fd652f62cf47e7b375196063bbbd503e853af5be16597cb2e
+Status: Image is up to date for nginx:latest
+$
+```
+
+続いてタグ付けを行う．
+アップロード先とイメージ名を指定すると思って欲しい．
+
+```
+$ sudo docker tag nginx localhost:5000/nginx
+$
+```
+
+さらにpushを行う．
+pushの後に続くのはタグ名である．
+
+```
+$ sudo docker push localhost:5000/nginx
+The push refers to repository [localhost:5000/nginx]
+86df2a1b653b: Pushed
+bc5b41ec0cfa: Pushed
+237472299760: Pushed
+latest: digest: sha256:d98b66402922eccdbee49ef093edb2d2c5001637bd291ae0a8cd21bb4c36bebe size: 948
+$
+```
+
+それでは，```nginx.yaml```を以下のように書き換えて，実際に起動してみよう．
+実際に書き換えるのは```spec.template.spec.containers.image```（spec内の，template内の，spec内の，containers内のimageという項目を指す）である．
+すでに```service.yaml```や```ingress.yaml```などと併用してnginxが動いていることを前提としているので，まだ動かしていない場合は，順番に起動すること．
+
+```
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: "localhost:5000/nginx"
+        ports:
+        - containerPort: 80
+```
+
+書き換えたら起動しよう．
+
+```
+$ kubectl apply -f nginx.yaml
+deployment.apps/nginx created
+$
+```
+
+Webブラウザでlocalhostにアクセスすると・・・残念ながらこれまでと同じコンテンツが表示される．
+とりあえずWebサーバが動いていることを確認すれば良いこととする．
+
+### Dockerイメージを作ってRegistryにpushする
+
+ダウンロードしたイメージを登録するだけでは何も嬉しくないので，Dockerイメージを自作してRegistryに登録する．
+Dockerfileの作成　→　イメージのビルド　→　タグ付け　→　Registryへのpushの手順で行う．
+
+まずはDockerfileの作成を行う．
+以下の内容を持つ，Dockerfileというファイルを作成する．
+内容は，1行目で```localhost:5000/nginx```というイメージをベースにすることを宣言し，2行目でカレントディレクトリにあるhtmlというディレクトリの内容を```/usr/share/nginx/html```にコピーする．
+
+```
+FROM localhost:5000/nginx
+COPY ./html/ /usr/share/nginx/html/
+```
+
+コピーするhtmlファイルも作成する．
+
+```
+$ mkdir html
+```
+
+htmlディレクトリ内にindex.htmlを作成する．
+内容は何でも良いが，サンプルを以下に示す．
+index.html以外のファイルも置いておくと良いが，とりあえずindex.htmlのみを置いておく．
+
+```
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+</head>
+
+<body>
+<p>This is a test page.<p>
+<p>Version 1.0</p>
+</body>
+</html>
+```
+
+続いてイメージのビルドを行う．
+ここでは-tオプションを使用して，タグ付けも同時に行っている．
+ここではタグ名をsuda-nginxとしている．
+
+```
+$ sudo docker build -t suda-nginx .
+Sending build context to Docker daemon  3.584kB
+Step 1/2 : FROM localhost:5000/nginx
+ ---> dbfc48660aeb
+Step 2/2 : COPY ./html/ /usr/share/nginx/html/
+ ---> 149b673dfae8
+Successfully built 149b673dfae8
+Successfully tagged suda-nginx:latest
+$
+```
+
+無事にイメージの作成が済んだら，Registryにpushする．
+
+```
+$ sudo docker push localhost:5000/suda-nginx
+The push refers to repository [localhost:5000/suda-nginx]
+8fcd42847d6b: Pushed
+86df2a1b653b: Mounted from nginx
+bc5b41ec0cfa: Mounted from nginx
+237472299760: Mounted from nginx
+latest: digest: sha256:dfaecb5001cc6fa509396cd752083c5420270ec226b60bacff885bfbc0dbe4df size: 1155
+$
+```
+
+### 自作イメージを起動する
+
+nginx.yamlを書き換えて，自作したイメージを動かしてみよう．
+先程と同様，```spec.template.spec.containsers.image```を変更する．
+
+```
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: "localhost:5000/suda-nginx"
+        ports:
+        - containerPort: 80
+```
+
+書き換えたら起動してみよう．
+
+```
+$ kubectl apply -f nginx.yaml
+deployment.apps/nginx created
+$
+```
+
+Webブラウザからlocalhostに接続すると，先ほど作成したindex.htmlが表示されるはずである．
+そうでなければ，スーパーリロードを実行すること．
 
 ## 終了方法
 
