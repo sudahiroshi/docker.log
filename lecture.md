@@ -368,6 +368,12 @@ f29c3e83f120        registry:2                           "/entrypoint.sh /etc…
 $
 ```
 
+[プライベートなDockerレジストリサーバーをコンテナで立てる](https://qiita.com/rsakao/items/617f54579278173d3c20)
+
+[privateなdockerレジストリを構築する](https://qiita.com/zknzfz/items/13d5d07ab5bb0feb1fd1)
+
+[Docker レジストリ](http://docs.docker.jp/registry/index.html)
+
 ### nginxをRegistryに登録する
 
 Registryへの登録は，Dockerイメージのダウンロード or Dockerイメージの作成 →　タグ付け　→　Registryへのpushの順に行う．
