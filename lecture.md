@@ -547,6 +547,168 @@ $
 Webブラウザからlocalhostに接続すると，先ほど作成したindex.htmlが表示されるはずである．
 そうでなければ，スーパーリロードを実行すること．
 
+## 複数のWebサイトを一括運営する
+
+さて，自分の好きなコンテンツをWebサーバから配信できるようになったので，次に複数のコンテンツを配信できるように設定する．
+これにはいくつかのやり方があり，それぞれ一長一短なので順番に試してみたい．
+
+名称 | 長所 | 短所
+--|--|--
+ポート番号で判断 | 他との干渉をあまり考えなくて良い | 80番と443番以外のポートが塞がれていることがある
+IPアドレスで判断 | DNSが死んでいても使える | 小規模な構成では柔軟性に欠ける
+ホスト名で判断 | とりあえずお勧め | SSLのキーの共有で引っかかるかも？
+パス名で判断 | SSLの設定で悩まなくて良い（たぶん） | ぶら下がるサービスによっては設定が面倒
+
+まずは，ホスト名で判断するように設定を行う．
+具体的には，ingress.yamlを変更すれば良い．
+
+#### ワイルドカードDNSとは？
+
+さて，ホスト名でサービスを判断するとなると，DNSへの登録が必要となる．
+しかし，本演習授業ではDNSサーバを構築していない．
+そのような際に役に立つのが```nip.io```や```xip.io```といったワイルドカードDNSというサービスである．
+
+ワイルドカードDNSとは，IPアドレス＋αで構成されるドメイン名をIPアドレスに直してくれるサービスである．
+言葉では伝わらないので，[nip.io](nip.io)のサイトに有る例を示す．
+
+ホスト名 | → | IPアドレス
+-|-|-
+10.0.0.1.nip.io | → | 10.0.0.1
+app.10.0.0.1.nip.io | → | 10.0.0.1
+customer1.app.10.0.0.1.nip.io | → | 10.0.0.1
+customer2.app.10.0.0.1.nip.io | → | 10.0.0.1
+otherapp.10.0.0.1.nip.io | → | 10.0.0.1
+
+このように，小規模でお試ししたいときに役に立つサービスである．
+これ以降の例では，各自のホストOSに割り振られているIPアドレスを使ってアクセスすると思って欲しい．
+
+それでは，nip.ioを試すために，debianのパッケージを追加しよう．
+使いたいコマンドは```host```コマンドであり，```host```パッケージに入っている．
+よって，以下のようにして追加できる．
+
+```
+$ sudo apt-get install host
+[sudo] suda のパスワード:
+パッケージリストを読み込んでいます... 完了
+依存関係ツリーを作成しています
+状態情報を読み取っています... 完了
+以下の追加パッケージがインストールされます:
+  bind9-host geoip-database libbind9-140 libdns162 libgeoip1 libisc160 libisccc140 libisccfg140 liblwres141
+提案パッケージ:
+  geoip-bin
+以下のパッケージが新たにインストールされます:
+  bind9-host geoip-database host libbind9-140 libdns162 libgeoip1 libisc160 libisccc140 libisccfg140 liblwres141
+アップグレード: 0 個、新規インストール: 10 個、削除: 0 個、保留: 4 個。
+4,934 kB のアーカイブを取得する必要があります。
+この操作後に追加で 14.4 MB のディスク容量が消費されます。
+続行しますか? [Y/n]
+取得:1 http://ftp.jp.debian.org/debian stretch/main amd64 libgeoip1 amd64 1.6.9-4 [90.5 kB]
+取得:2 http://ftp.jp.debian.org/debian stretch/main amd64 libisc160 amd64 1:9.10.3.dfsg.P4-12.3+deb9u4 [398 kB]
+取得:3 http://ftp.jp.debian.org/debian stretch/main amd64 libdns162 amd64 1:9.10.3.dfsg.P4-12.3+deb9u4 [1,077 kB]
+取得:4 http://ftp.jp.debian.org/debian stretch/main amd64 libisccc140 amd64 1:9.10.3.dfsg.P4-12.3+deb9u4 [198 kB]
+取得:5 http://ftp.jp.debian.org/debian stretch/main amd64 libisccfg140 amd64 1:9.10.3.dfsg.P4-12.3+deb9u4 [223 kB]
+取得:6 http://ftp.jp.debian.org/debian stretch/main amd64 libbind9-140 amd64 1:9.10.3.dfsg.P4-12.3+deb9u4 [206 kB]
+取得:7 http://ftp.jp.debian.org/debian stretch/main amd64 liblwres141 amd64 1:9.10.3.dfsg.P4-12.3+deb9u4 [214 kB]
+取得:8 http://ftp.jp.debian.org/debian stretch/main amd64 bind9-host amd64 1:9.10.3.dfsg.P4-12.3+deb9u4 [231 kB]
+取得:9 http://ftp.jp.debian.org/debian stretch/main amd64 geoip-database all 20170512-1 [2,112 kB]
+取得:10 http://ftp.jp.debian.org/debian stretch/main amd64 host all 1:9.10.3.dfsg.P4-12.3+deb9u4 [186 kB]
+4,934 kB を 1秒 で取得しました (3,276 kB/s)
+以前に未選択のパッケージ libgeoip1:amd64 を選択しています。
+(データベースを読み込んでいます ... 現在 53932 個のファイルとディレクトリがインストールされています。)
+.../0-libgeoip1_1.6.9-4_amd64.deb を展開する準備をしています ...
+libgeoip1:amd64 (1.6.9-4) を展開しています...
+以前に未選択のパッケージ libisc160:amd64 を選択しています。
+.../1-libisc160_1%3a9.10.3.dfsg.P4-12.3+deb9u4_amd64.deb を展開する準備をしています ...
+libisc160:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を展開しています...
+以前に未選択のパッケージ libdns162:amd64 を選択しています。
+.../2-libdns162_1%3a9.10.3.dfsg.P4-12.3+deb9u4_amd64.deb を展開する準備をしています ...
+libdns162:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を展開しています...
+以前に未選択のパッケージ libisccc140:amd64 を選択しています。
+.../3-libisccc140_1%3a9.10.3.dfsg.P4-12.3+deb9u4_amd64.deb を展開する準備をしています ...
+libisccc140:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を展開しています...
+以前に未選択のパッケージ libisccfg140:amd64 を選択しています。
+.../4-libisccfg140_1%3a9.10.3.dfsg.P4-12.3+deb9u4_amd64.deb を展開する準備をしています ...
+libisccfg140:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を展開しています...
+以前に未選択のパッケージ libbind9-140:amd64 を選択しています。
+.../5-libbind9-140_1%3a9.10.3.dfsg.P4-12.3+deb9u4_amd64.deb を展開する準備をしています ...
+libbind9-140:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を展開しています...
+以前に未選択のパッケージ liblwres141:amd64 を選択しています。
+.../6-liblwres141_1%3a9.10.3.dfsg.P4-12.3+deb9u4_amd64.deb を展開する準備をしています ...
+liblwres141:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を展開しています...
+以前に未選択のパッケージ bind9-host を選択しています。
+.../7-bind9-host_1%3a9.10.3.dfsg.P4-12.3+deb9u4_amd64.deb を展開する準備をしています ...
+bind9-host (1:9.10.3.dfsg.P4-12.3+deb9u4) を展開しています...
+以前に未選択のパッケージ geoip-database を選択しています。
+.../8-geoip-database_20170512-1_all.deb を展開する準備をしています ...
+geoip-database (20170512-1) を展開しています...
+以前に未選択のパッケージ host を選択しています。
+.../9-host_1%3a9.10.3.dfsg.P4-12.3+deb9u4_all.deb を展開する準備をしています ...
+host (1:9.10.3.dfsg.P4-12.3+deb9u4) を展開しています...
+geoip-database (20170512-1) を設定しています ...
+libgeoip1:amd64 (1.6.9-4) を設定しています ...
+libc-bin (2.24-11+deb9u3) のトリガを処理しています ...
+liblwres141:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を設定しています ...
+libisc160:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を設定しています ...
+libisccc140:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を設定しています ...
+libdns162:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を設定しています ...
+libisccfg140:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を設定しています ...
+libbind9-140:amd64 (1:9.10.3.dfsg.P4-12.3+deb9u4) を設定しています ...
+bind9-host (1:9.10.3.dfsg.P4-12.3+deb9u4) を設定しています ...
+host (1:9.10.3.dfsg.P4-12.3+deb9u4) を設定しています ...
+libc-bin (2.24-11+deb9u3) のトリガを処理しています ...
+$
+```
+
+これでhostコマンドのインストールが完了したので，以下のように試してみよう．
+
+```
+// まずはお試し
+$ host 10.0.0.1.nip.io
+10.0.0.1.nip.io has address 10.0.0.1  // ←10.0.0.1が返る
+// その前にホスト名を追加する例
+$ host web.10.0.0.1.nip.io
+web.10.0.0.1.nip.io has address 10.0.0.1 // ←これもきちんと10.0.0.1が返る
+// 例えば10.0.2.15を引いてみる
+$ host 10.0.2.15.nip.io
+10.0.2.15.nip.io has address 10.0.2.15 // ←このように，どんなIPアドレスであっても返ってくる
+```
+
+#### ホスト名ベースのWebサイト用のingress.yaml
+
+それでは，ホスト名ベースのWebサイト用のingress.yamlを以下のように作成しよう．
+spec.rules.hostの欄は各自のホストOSに割り振られているIPアドレスをベースとした名前に変更すること．
+なお，先頭のweb1については好きに変更して良い．
+
+
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: test-ingress
+spec:
+  rules:
+  - host: web1.172.16.121.165.nip.io
+    http:
+      paths:
+      - backend:
+        serviceName: nginx
+        servicePort: 80
+```
+
+以下のようにして設定を反映させよう．
+
+```
+$ kubectl apply -f ingress.yaml
+```
+
+これで，ホストOSのWebブラウザから```web1.172.16.121.165.nip.io```にアクセスすると，先程のWebページが表示される．
+設定のポイントは，spec.rules.http.paths.backend.serviceNameであり，，service.yamlで設定した名前と一致していれば良い．
+すなわち，別名でdeploymentやserviceを登録すれば複数のWebサービスを起動することができ，ingress.yamlでホスト名ごとにサービスを提供することが可能である．
+
+※そのために，複数のWebサーバのコンテナが必要になるので，各自作成すること．
+
+
+
 ## 終了方法
 
 終了するときは以下のコマンドを実行する．
