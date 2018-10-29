@@ -499,7 +499,14 @@ Successfully tagged suda-nginx:latest
 $
 ```
 
-無事にイメージの作成が済んだら，Registryにpushする．
+無事にイメージの作成が済んだら，レジストリ名を含んだタグを付けます。
+
+```
+$ sudo docker tag suda-nginx localhost:5000/suda-nginx
+$
+```
+
+続けてRegistryにpushする．
 
 ```
 $ sudo docker push localhost:5000/suda-nginx
