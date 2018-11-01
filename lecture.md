@@ -697,9 +697,10 @@ spec:
   - host: web1.172.16.121.165.nip.io
     http:
       paths:
-      - backend:
-        serviceName: nginx
-        servicePort: 80
+        - path: /
+          backend:
+            serviceName: nginx
+            servicePort: 80
 ```
 
 以下のようにして設定を反映させよう．
