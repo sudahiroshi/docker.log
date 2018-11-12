@@ -774,6 +774,8 @@ top | リソース利用量を確認する | kubectl top node | 各ノードのC
 exec | Pod上でコマンドを確認する | kubectl exec -it ex1 /bin/sh | ex1上でシェルを起動する．対話型コマンドを実行する際には「-it」を付けること．
 〃 | 〃 | kubectl exec ex1 /bin/-ls -l | ex1上でlsコマンドを実行する
 logs | ログを確認する | kubectl logs ex1 | ex1のログを確認する
+rollout | 更新履歴を表示する | kubectl rollout history ex-dep1 | Deployment名ex-dep1の更新履歴を表示する
+〃 | 更新を取り消す | kubectl rollout undo ex-dep1 --to-revision=1 | Deployment名ex-dep1を最新の状態から1つ戻す
 
 その他，次のようなオプションを付けることができる．
 
@@ -782,8 +784,9 @@ $ kubectl get pods -o wide
 $ kubectl get pods -o yaml
 $ kubectl get all
 $ kubectl get all -o wide
+$ kubectl get all --all-namespaces
 ```
 
 複数形の場合は（podsなど）一覧，単数形の場合（podなど）はPod名を後ろに付ける．
-確認できるリソースは，pod，node，deployment，ingressなど.
+確認できるリソースは，pods, nodes, replicaset, deployments, services, namespaces, ingressなど.
 
