@@ -762,17 +762,17 @@ Kubernetesは，基本的にすべての動作をkubectlコマンドで制御で
 ここでは，サブコマンドを整理する．
 
 サブコマンド | 役割 | 使用例 | 注
---|--|--
+--|--|--|--
 create | マニフェストに則ってリソースを作成する | kubectl create -f example.yaml | マニフェストファイルはexample.yaml
 delete | マニフェストに則ってリソースを削除する | kubectl delete -f example.yaml | マニフェストファイルはexample.yaml
 apply | マニフェストに則ってリソースを更新する | kubectl apply -f example.yaml | マニフェストファイルを編集後に実行することが多い
 edit | マニフェストを編集する | kubectl edit pod ex1 | Pod名がex1のマニフェストを編集する場合の例
 get | リソース情報を確認する | kubectl get pods | 動作しているPod一覧を表示
- |  | kubectl get pod ex1 | Pod名がex1のリソースを確認する
+〃 | 〃 | kubectl get pod ex1 | Pod名がex1のリソースを確認する
 describe | 詳細なリソース情報を確認する | kubectl describe pod ex1 | Pod名がex1のリソースの詳細情報を確認する
 top | リソース利用量を確認する | kubectl top node | 各ノードのCPU，Memoryの利用状況を確認する
 exec | Pod上でコマンドを確認する | kubectl exec -it ex1 /bin/sh | ex1上でシェルを起動する．対話型コマンドを実行する際には「-it」を付けること．
- | | kubectl exec ex1 /bin/-ls -l | ex1上でlsコマンドを実行する
+〃 | 〃 | kubectl exec ex1 /bin/-ls -l | ex1上でlsコマンドを実行する
 logs | ログを確認する | kubectl logs ex1 | ex1のログを確認する
 
 その他，次のようなオプションを付けることができる．
