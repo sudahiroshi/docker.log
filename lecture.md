@@ -382,7 +382,7 @@ $
 （実行結果が正規のものではないので、後で差し替えておきます）
 
 ```
-$ sudo codker ps -a | grep registry
+$ sudo docker ps -a | grep registry
 f29c3e83f120        registry:2                           "/entrypoint.sh /etc…"
 $
 ```
