@@ -853,7 +853,7 @@ CMD ["npm","start"]
 ```
 $ sudo docker build -t animal .
 $ sudo docker tag animal localhost:5000/animal
-$ sudo docker push localhsot:5000/animal
+$ sudo docker push localhost:5000/animal
 ```
 
 ### まずはDockerで動かしてみる
