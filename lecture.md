@@ -790,3 +790,81 @@ $ kubectl get all --all-namespaces
 複数形の場合は（podsなど）一覧，単数形の場合（podなど）はPod名を後ろに付ける．
 確認できるリソースは，pods, nodes, replicaset, deployments, services, namespaces, ingressなど.
 
+## node.jsでサービスを作ろう
+
+### Animal
+
+複数のWebブラウザ間で同期する，動物に司令を送ると任意の座標に移動したり，大きさを変えるサービスを例題とする．
+通常であれば，以下のようにして起動できる（まだやらないこと！）．
+
+```
+$ git clone https://github.com/sudahiroshi/node-animal.git
+$ cd node-animal
+$ npm install
+$ npm start
+```
+
+上記のように実行すると，3000番ポートで待ち受けするので，Webブラウザから```http://localhost:3000/caht/```にアクセスすると，動物がゴチャゴチャと固まっている．
+フォームに例えば```panda move 200 200```と入力し，```send```をクリックすると，その座標にパンダが移動する．
+2回目以降の移動はスムースになる．
+他に，```panda size 200```と入力すると，パンダの多きさが200になる．
+
+今回はイカの手順で進めていく．
+
+1. ベースとなるDockerイメージを決める
+2. Dockerfileを作成する
+3. buildする
+4. まずはDockerで動かしてみる (←new)
+5. うまくできたらKubernetesの設定ファイルを書いてみる
+
+### Dockerイメージを決める
+Dockerhubでnode.jsのイメージを眺めると，公式のnode環境```https://hub.docker.com/_/node/```が存在するので，これを使う．
+他を使いたい場合は自己責任で追いかけること．
+
+いろいろ書き換えるので，まずは手元にイメージを持ってきて，自前のレジストリに登録しよう．
+レジストリの起動は，上の方にあるので参照して，起動しておくこと．
+
+以下，レジストリが動いているものとする．
+
+```
+$ sudo docker pull node
+$ sudo docker tag node localhost:5000/node
+$ sudo docker push localhost:5000/node
+```
+
+### Dockerfileの作成
+次にDockerfileを作成する．
+Dockerfileは，```FROM```でもととなるイメージを指定するので，以下のようになる．
+そこから先は，実行するコマンドを1行ずつ書いていくのに近いので，以下のような感じとする．
+
+```
+FROM localhost:5000/node
+RUN git clone https://github.com/sudahiroshi/node-animal.git
+WORKDIR node-animal
+RUN npm install
+EXPOSE 3000
+CMD ["npm","start"]
+```
+
+### buildする
+
+上記Dockerfileがあるディレクトリで，以下の作業を行う．
+
+```
+$ sudo docker build -t animal .
+$ sudo docker tag animal localhost:5000/animal
+$ sudo docker push localhsot:5000/animal
+```
+
+### まずはDockerで動かしてみる
+ここまでほとんど説明してこなかったが，Dockerコマンドを使って起動してみよう．
+起動したら，Webブラウザからアクセスしよう．
+ただし，仮想計算機の3000番ポートにポートフォワードするよう，設定が必要なので注意．
+
+```
+$ sudo docker run --rm -p 3000:3000 animal
+```
+
+
+
+
