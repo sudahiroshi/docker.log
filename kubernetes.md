@@ -160,20 +160,7 @@ suda@kube01:~$
 Swapを一時的に停止するコマンドは```swapoff```である．
 
 ```
-suda@debian:~$ sudo fdisk -l
-Disk /dev/sda: 20 GiB, 21474836480 bytes, 41943040 sectors
-Units: sectors of 1 * 512 = 512 bytes
-Sector size (logical/physical): 512 bytes / 512 bytes
-I/O size (minimum/optimal): 512 bytes / 512 bytes
-Disklabel type: dos
-Disk identifier: 0x23e82d34
-
-Device     Boot    Start      End  Sectors  Size Id Type
-/dev/sda1  *        2048 39845887 39843840   19G 83 Linux
-/dev/sda2       39847934 41940991  2093058 1022M  5 Extended
-/dev/sda5       39847936 41940991  2093056 1022M 82 Linux swap / Solaris
-
-suda@debian:~$ sudo swapoff /dev/sda5
+suda@debian:~$ sudo swapoff -a
 
 suda@debian:~$
 ```
@@ -264,7 +251,7 @@ Pod間の通信手段をセットアップする．
 前節で書いたが，ここではFlannelを採用する．
 
 ```
-suda@debian:~$ kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/v0.9.1/Documentation/kube-flannel.yml
+suda@debian:~$ kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 clusterrole "flannel" created
 clusterrolebinding "flannel" created
 serviceaccount "flannel" created
@@ -311,6 +298,24 @@ debian    Ready      master    3m        v1.9.3
 続いて，Workerノードを追加する．
 workerノードとは，実際にサービスが実行されるホストである．
 なお，ここで入力する内容は，Masterノードで```kubeadm init```を実行した際に表示される内容である．
+
+注：ここで、docker-ce 19.03だとエラーが出る。18.09を使わないといけないようだ。
+また、VirtualBoxで解放したポートは以下の通り。
+
+プロトコル | ポート
+-|-
+TCP | 80
+TCP | 22
+TCP | 6443
+TCP | 8472
+TCP | 31707
+TCP | 443
+TCP | 10251
+TCP | 10252
+TCP | 10256
+TCP | 4194
+TCP | 2379
+TCP | 8472
 
 ```
 suda@node2:~$ sudo kubeadm join --token ac622a.4225187698b87e71 172.16.121.160:6443 --discovery-token-ca-cert-hash sha256:572be0ef181ba23d987edf03501b00037ee97aa4c23c3a2603a8914f86023e04
