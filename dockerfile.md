@@ -201,62 +201,22 @@ ENTRYPOINTとCMDは，ほぼ同じ機能を持っています．
 3. 両方記述した場合は，ENTRYPOINTがコマンドになり，CMDがオプションになる．
 4. 両方記述した場合は，CMDが上書きされる＝オプションが上書きされる．
 
-上から見ていくと，環境変数を設定したり，
-
+上から見ていくと，環境変数を設定したり，アーキテクチャを調べて適合するファイルをダウンロードするなどの処理が行われている．
+その上で，最後に```docker-entrypoint.sh```というファイルをローカルからDockerイメージにコピーして実行している．
+このような形でインフラのコード化が実現されている．
 
 ### Dockerfileに追記する
 
-続いて，Dockerfile上で目的とするリポジトリの内容をダウンロードして，さらに使用するパッケージをダウンロードしてみましょう．
-使用するユーザ名はnodeなので，作業するホームディレクトリは```/home/node```です．
-
-ここで，Gogsの動いているホストは，Dockerで起動したホストとは別のIPアドレスを持っています．
-よって，GitサーバのIPアドレスとして，DebianのIPアドレスを調べて記載します．
-IPアドレスを調べるには，```ip address show```を使用します．
-実行例を以下に示します．
-Dockerをインストールすると，ネットワークインタフェースが増えるので見づらいですが，```ens33```が標準的なインタフェースです．
-よって，この例ではIPアドレスとして```172.16.121.160```を使用します．
+自分のサービスを立ち上げたい場合は，Dockerfileに追記することになる．
+この場合，元のイメージとしてnginxを指定して，そこにつながる一連の処理を記述するDockerfileを作れば良い．
+以下に例を示す．
 
 ```
-suda@debian:~$ ip address show
-1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1
-    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
-    inet 127.0.0.1/8 scope host lo
-       valid_lft forever preferred_lft forever
-    inet6 ::1/128 scope host
-       valid_lft forever preferred_lft forever
-2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
-    link/ether 00:0c:29:80:d8:eb brd ff:ff:ff:ff:ff:ff
-    inet 172.16.121.160/24 brd 172.16.121.255 scope global ens33
-       valid_lft forever preferred_lft forever
-    inet6 fe80::20c:29ff:fe80:d8eb/64 scope link
-       valid_lft forever preferred_lft forever
-3: docker0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default
-    link/ether 02:42:9c:b1:83:a1 brd ff:ff:ff:ff:ff:ff
-    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
-       valid_lft forever preferred_lft forever
-    inet6 fe80::42:9cff:feb1:83a1/64 scope link
-       valid_lft forever preferred_lft forever
-7: veth9ef744b@if6: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default
-    link/ether 5a:e9:76:70:b8:6c brd ff:ff:ff:ff:ff:ff link-netnsid 0
-    inet6 fe80::58e9:76ff:fe70:b86c/64 scope link
-       valid_lft forever preferred_lft forever
-32: br-874d40a2c02c: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default
-    link/ether 02:42:6b:bc:1a:80 brd ff:ff:ff:ff:ff:ff
-    inet 172.18.0.1/16 brd 172.18.255.255 scope global br-874d40a2c02c
-       valid_lft forever preferred_lft forever
-    inet6 fe80::42:6bff:febc:1a80/64 scope link
-       valid_lft forever preferred_lft forever
-suda@debian:~$
-```
-
-ここまでのDockerfileを示します．
-
-```
-FROM node:8.9.4-stretch
+FROM node:8.16.2-stretch
 
 ENV HOME=/home/node
 WORKDIR $HOME
-RUN git clone http://172.16.121.160:3000/suda/node_chat
+RUN git clone ここにURLを記載する
 WORKDIR $HOME/node_chat
 RUN npm install
 ```
@@ -265,9 +225,9 @@ RUN npm install
 手元のDockerfileを使うためには，まずbuildします．
 
 ```
-suda@debian:~/work$ sudo docker build -t node_chat:1.0 .
+suda@debian:~/work$ sudo docker build -t node_animal:1.0 .
 Sending build context to Docker daemon  13.53MB
-Step 1/9 : FROM node:8.9.4-stretch
+Step 1/9 : FROM node:8.16.2-stretch
  ---> a264e6327bde
 Step 2/9 : ENV HOME=/home/node
  ---> Using cache
@@ -275,7 +235,7 @@ Step 2/9 : ENV HOME=/home/node
 Step 3/9 : WORKDIR $HOME
  ---> Using cache
  ---> 56b3346a0d08
-Step 4/9 : RUN git clone http://172.16.121.160:3000/suda/node_chat
+Step 4/9 : RUN git 指定したURL
  ---> Using cache
  ---> d304e5853ad9
 Step 5/9 : WORKDIR $HOME/node_chat
@@ -285,7 +245,7 @@ Step 6/9 : RUN npm install
  ---> Using cache
  ---> a8d24c4378ff
 Successfully built da8b6eb13426
-Successfully tagged node_chat:1.0
+Successfully tagged node_animal:1.0
 suda@debian:~/work$
 ```
 
@@ -293,7 +253,7 @@ suda@debian:~/work$
 具体的には```pwd```や```ls```などでファイルが有ることを確認します．
 
 ```
-suda@debian:~/work$ sudo docker run -it --rm -p 4000:4000 node_chat:1.0 /bin/bash
+suda@debian:~/work$ sudo docker run -it --rm -p 80:80 node_animal:1.0 /bin/bash
 
 root@105d383d5491:~/test# pwd
 /home/node/test
@@ -311,15 +271,15 @@ suda@debian:~/work$
 （PORTが決め打ちなのは格好悪いのと応用が効かないので，後で直します）
 
 ```
-FROM node:8.9.4-stretch
+FROM node:8.16.2-stretch
 
 ENV HOME=/home/node
 WORKDIR $HOME
-RUN git clone http://172.16.121.160:3000/suda/test
+RUN git clone ここにURLを記載する
 WORKDIR $HOME/test
 RUN npm install
-ENV PORT 4000
-EXPOSE 4000
+ENV PORT 80
+EXPOSE 80
 CMD [ "npm", "start" ]
 ```
 
@@ -327,81 +287,12 @@ CMD [ "npm", "start" ]
 今度はバージョン番号を1.1にしましょう．
 
 ```
-suda@debian:~/work$ sudo docker build -t node_chat:1.1 .
+suda@debian:~/work$ sudo docker build -t node_animal:1.1 .
 （ログは省略）
-suda@debian:~/work$ sudo docker run -it --rm -p 4000:4000 node_chat:1.1
+suda@debian:~/work$ sudo docker run -it --rm -p 80:80 node_chat:1.1
 （ログは省略）
 ```
 
-Webブラウザから```http://localhost:4000/chat.html```にアクセスしてみましょう．
+Webブラウザから```http://localhost/chat.html```にアクセスしてみましょう．
 うまく動いていればチャットの画面が表示されるはずです．
 
-## Docker Compose化する
-
-ここまでできると，起動のためのdockerコマンドが面倒と感じるようになってくると思います．
-これを解消するために，docker composeを使用します．
-本来のdocker composeは複数のコンテナを連携させるオーケストレーションの仕組みですが，起動を楽にする意味も含まれています．
-それではdocker-compose.ymlの例を示します．
-
-```
-version: '2'
-services:
-  node_chat:
-    build: .
-    environment:
-     - "PORT=4000"
-    ports:
-     - "4000:4000"
-```
-
-短いと思うかもしれませんが，単独のコンテナを起動するだけなのでこの程度で済んでいます．
-自前のDockerfileを扱うための記述が```build```です．
-この場合は，カレントディレクトリに有るDockerfileを使用することを示しています．
-他のディレクトリに存在するDockerfileを使ってサービスを起動することも可能です．
-
-それでは起動してみましょう．起動するためには以下のようにします．
-見て分かるように，docker-composeコマンドでサービスを起動すると，イメージの作成からサービスの起動までが実行されます．
-
-```
-suda@debian:~/work$ sudo docker-compose up
-Creating network "work_default" with the default driver
-Building node_chat
-Step 1/9 : FROM node:8.9.4-stretch
- ---> a264e6327bde
-Step 2/9 : ENV HOME=/home/node
- ---> Using cache
- ---> 27f1735a713a
-Step 3/9 : WORKDIR $HOME
- ---> Using cache
- ---> 56b3346a0d08
-Step 4/9 : RUN git clone http://172.16.121.160:3000/suda/test
- ---> Using cache
- ---> d304e5853ad9
-Step 5/9 : WORKDIR $HOME/test
- ---> Using cache
- ---> 10c7cae75760
-Step 6/9 : RUN npm install
- ---> Using cache
- ---> a8d24c4378ff
-Step 7/9 : ENV PORT 4000
- ---> Using cache
- ---> b58ac8e270b6
-Step 8/9 : EXPOSE 4000
- ---> Using cache
- ---> 2abe6e3efc44
-Step 9/9 : CMD [ "npm", "start" ]
- ---> Using cache
- ---> da8b6eb13426
-Successfully built da8b6eb13426
-Successfully tagged work_node_chat:latest
-WARNING: Image for service node_chat was built because it did not already exist. To rebuild this image you must use `docker-compose build` or `docker-compose up --build`.
-Creating work_node_chat_1 ... done
-Attaching to work_node_chat_1
-node_chat_1  |
-node_chat_1  | > node-test@0.0.0 start /home/node/test
-node_chat_1  | > node ./bin/www
-```
-
-後は，作成したDockerfileとdocker-compose.ymlを，Gitサーバにアップロードしておくことを勧めます．
-その際，node_chat内に入れても良いですし，別々でも構いません．
-（今回の書き方は別のリポジトリに入れることを前提としていますが，少し変更するだけなので挑戦してみてください）
