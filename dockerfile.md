@@ -174,31 +174,35 @@ suda@debian:~/temp/node_animal$ npm start
 ## Dockerfileの作成
 
 やっと準備が整ったので，次はDockerfileを作成してDocker化します．
-以前説明しましたが，基本的にDockerfileでは，インストール手順を順番に記述します．
-ここで，DockerHubに登録されているnodeのイメージを使えば，node.jsのインストールは不要です．
-[node](https://hub.docker.com/_/node/)を確認すると，様々な環境が揃っています．
-元々Debian9上で，node8.9.4を使って開発していたので，同じ環境（8.9.4-stretch）を使用しましょう．
+基本的にDockerfileには，元となるイメージを記述し，その後インストール手順を順番に記述します．
+Dockerfileの多くは[Dockerhub](https://hub.docker.com/)に登録されています．
+例えばnode.jsのDockerfileを確認したければ，[node](https://hub.docker.com/_/node/)にあります．
+多数のDockerfileが表示されるのは，そもそもnode.jsに複数のバージョンが有ることと，それを動かす環境が多数あること，ユーザがどの程度の利便性を求めるか分からないので場合分けしてあることなどが理由です．
 
-念のためDockerfileを覗いてみます．
-[nodejs/docker-node](https://github.com/nodejs/docker-node/blob/994f8286cb0efc92578902d5fd11182f63a59869/8/stretch/Dockerfile)
-ざっと見てみると，nodeというユーザを作っているので，このユーザを使ってサービスを動かすことにします．
+例えばDebina9上でnode.js ver.8.16.2を用いるためのDockerfileを確認したい場合は，```8.16.2-stretch```をクリックしてみてください．
+Github内のDockerfileが表示されます．
+そのように別々の条件のDockerが多数アップロードされています．
 
-それでは，node8.9.4-stretchを使用するDockerfileを作ってみましょう．
-ディレクトリはホームディレクトリの直下にworkを作成して，ここに作ることにします．
+Dockerfile内の各行の先頭にあるのが「命令」で，そこに引数があることが分かれば読み解きやすいと思います．
+例としていくつかの命令とその意味を記載します．
 
-```
-suda@debian:~$ mkdir work
+命令 | 意味
+-|-
+FROM | 元となるDockerfile
+RUN | コマンドの実行
+ENV | 環境変数の設定
+COPY | ファイルのコピー
+ENTRYPOINT | コンテナ起動時に実行するコマンド
+CMD | コンテナ起動時に実行するコマンド
 
-suda@debian:~$ cd work
-```
+ENTRYPOINTとCMDは，ほぼ同じ機能を持っています．
+1. 通常はENTRYPOINTとCMDのどちらか1つを記述する．
+2. CMDは，docker runコマンドで上書き可能．
+3. 両方記述した場合は，ENTRYPOINTがコマンドになり，CMDがオプションになる．
+4. 両方記述した場合は，CMDが上書きされる＝オプションが上書きされる．
 
-ファイルの内容は以下のとおりです．
+上から見ていくと，環境変数を設定したり，
 
-```
-FROM node:8.9.4-stretch
-```
-
-とりあえずこれだけでOKです．
 
 ### Dockerfileに追記する
 
