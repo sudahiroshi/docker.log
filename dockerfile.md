@@ -5,6 +5,8 @@ node.jsを利用して作成したサービスをDocker化する方法
 
 使用環境
 - VirtualBox
+- Debian
+- git
 
 ## Docker化
 
@@ -35,83 +37,65 @@ gitサーバとして，GitHubが有名ですが，すでにGitLabやBitBucket�
 ### gitの使い方
 
 初めてアカウントを作った人や，アカウントはあるけれども不慣れな人は，まずは新しいリポジトリを作成してみましょう．
-例えばGitHubだと，
+例えばGitHubだと，ログイン後に出てくる画面（ダッシュボードと言います）の画面情報にある```Repositories```をクリックして，その右下に出てくる```New```ボタンをクリックしてください．
+するといくつかの項目に関する入力欄が出てきます．
+練習用に，以下のようにして新しいリポジトリを作ってみましょう．
 
-
-項目 | 説明
+項目 | 項目（日本語） | 説明
 -|-
-オーナー | あなたの作成したユーザ名
-リポジトリ名 | とりあえずnode_chatとしておいてください
-公開/非公開 | 公開にしてください（チェックを付けない）
-説明 | 好きに入力してください
-.gitignore | nodeと入力するとメニューが出てくるのでNodeを選択してください
-ライセンス | 特に入力しなくて良いです
-Readme | Default
-最後の項目 | 「選択されたファイル及びテンプレートでリポジトリを初期化」にチェックを入れてください．
+Owner | オーナー | あなたのユーザ名
+Repository name | リポジトリ名 | とりあえずtestとしておいてください
+Description | 説明 | 「練習用」とするか，カラのままでも構いません
+Public / Private | 公開/非公開 | 公開にしてください
+Initialize 以下略 | READMEを作成するか？ | とりあえずチェックを付けてください
+Add .gitignore | .gitignoreを作るか？ | Nodeを選択してください
+Add a license | ライセンス | 特に入力しなくて良いです
+
 （この辺はgitコマンドに慣れている人はこの手順に沿わなくて構いません．
 ここで紹介しているのは初心者でも戸惑わずに遂行できる手順です）
 
 すると，```.gitignore```と```README.md```が存在するリポジトリが作られます．
-一旦，Debian上でこのリポジトリをcloneしましょう．
+一旦，Windows上でこのリポジトリをcloneしましょう．
+
+今作成したリポジトリの上の方に```Clone or download```というボタンがあると思います．
+これをクリックするとメニューが開くので，URLの右にあるコピーボタンを押してください．
+その後，リポジトリをclone（サーバから手元にコピー）を行います．
 
 ```
-suda@debian:~$ git clone http://localhost:3000/suda/node_chat.git
-Cloning into 'node_chat'...
-remote: Counting objects: 4, done.
+suda@debian:~$ git clone まで入力したらペースト操作をする
+Cloning into 'test'...
+remote: Counting objects: 2, done.
 remote: Compressing objects: 100% (3/3), done.
-remote: Total 4 (delta 0), reused 0 (delta 0)
-Unpacking objects: 100% (4/4), done.
-suda@debian:~$
+remote: Total 2 (delta 0), reused 0 (delta 0)
+Unpacking objects: 100% (2/2), done.
+suda@debian:~$ 
 ```
 
-次に，このディレクトリに過去に作成したnode_testから必要なファイルをコピーします．
-ディレクトリ構造が異なる人は，適宜変更してください．
+すると，testディレクトリが作成されて，その中に.gitignoreとREADME.mdが作られているはずです．
+ただし，.gitignoreは表示されないかもしれません．
+
+続いて，testディレクトリにファイルを作成します．
+ここでは，Webページの雛形を入れてみましょう．
+ファイル名はindex.htmlとします．
+（他のファイルが良い人は，適当なファイル名を付けてください）
+
+次に，増えたファイルをサーバにアップロードしてみましょう．
+その前に，ユーザ名とメールアドレスの設定が必要です．
 
 ```
-suda@debian:~$ cp -R node_test/* node_chat
-suda@debian:~$
+suda@debian:~$ git config --global user.name "ユーザ名"
+suda@debian:~$ git config --global user.email "メールアドレス"
 ```
 
-続いて，コピーしたファイルをgitに認識させてサーバにアップロードします．
-一連の履歴を掲載します．
-見やすくするよう，コマンドを入力する場合は一行空けておきます．
+それでは，今度こそサーバにアップロードしてみましょう．
 
-```bash
-suda@debian:~$ cd node_chat
-
-suda@debian:~/node_chat$ ls
-README.md  app.js  bin  node_modules  package-lock.json  package.json  public  routes  views
-
-suda@debian:~/node_chat$ git add .
-
-suda@debian:~/node_chat$ git commit -am 'ファイルを追加'
-[master 084e3c8] ファイルを追加
- 9 files changed, 872 insertions(+)
- create mode 100644 app.js
- create mode 100755 bin/www
- create mode 100644 package-lock.json
- create mode 100644 package.json
- create mode 100644 public/stylesheets/style.css
- create mode 100644 routes/index.js
- create mode 100644 routes/users.js
- create mode 100644 views/error.ejs
- create mode 100644 views/index.ejs
- 
-suda@debian:~/node_chat$ git push
-Counting objects: 16, done.
-Delta compression using up to 2 threads.
-Compressing objects: 100% (13/13), done.
-Writing objects: 100% (16/16), 8.28 KiB | 0 bytes/s, done.
-Total 16 (delta 1), reused 0 (delta 0)
-Username for 'http://localhost:3000': suda
-Password for 'http://suda@localhost:3000':
-To http://localhost:3000/suda/node_chat.git
-   959a963..084e3c8  master -> master
-suda@debian:~/node_chat$
 ```
-
-無事に完了したら，Gogs上でリポジトリの内容を確認してみてください．
-（要リロード）
+suda@debian:~$ cd test
+suda@debian:~test$ git add .
+suda@debian:~test$ git commit -am 'First commit'　　　←ここにはコメントを入れてください
+suda@debian:~test$ git push
+suda@debian:~test$
+```
 
 gitコマンドの最低限の使い方を以下に示します．
 
@@ -131,12 +115,20 @@ gitコマンドは，macOSであれば追加インストールせずに使用で
 その他，GUIで操作するgitクライアントも存在するので，面倒ですがこちらを使用することも可能です．
 （つまり，macOSやWindows上で使い慣れたエディタを利用して開発可能です）
 
-## Gitサーバからcloneしてサービスを起動する
+その他，色々便利な機能があるので，徐々に調べながら使ってみてください．
+
+## node_animalをForkする
+
+Githubには，他の人のリポジトリを丸ごとコピーする機能があります．
+今回はnode_animalをForkしてみましょう．
+Github以外を使っている人は，この機能を使えません．
+その場合，node_animalをcloneした後に，全てのファイルをコピーしましょう．
+（本当はもっと便利な機能がありますが，後々使い方を調べてみてください）
+
+
+## Debian上でGitサーバからcloneしたサービスを起動する
 
 それでは，Gitサーバにアップロードしたサービスが，本当に使えるか試してみましょう．
-Dockerで動かしているnode_testがあったら終了させておいてください．
-また，Gogsは起動させておいてください．
-
 Debianのホームディレクトリから作業を始めます．
 
 ```
@@ -144,42 +136,40 @@ suda@debian:~$ mkdir temp
 
 suda@debian:~$ cd temp
 
-suda@debian:~/temp$ git clone http://localhost:3000/suda/node_chat.git
-Cloning into 'node_chat'...
+suda@debian:~/temp$ git clone 各自のnode_animalのURL
+Cloning into 'node_animal'...
 remote: Counting objects: 20, done.
 remote: Compressing objects: 100% (16/16), done.
 remote: Total 20 (delta 2), reused 0 (delta 0)
 Unpacking objects: 100% (20/20), done.
 
-suda@debian:~/temp$ cd node_chat
+suda@debian:~/temp$ cd node_animal
 
-suda@debian:~/temp/node_chat$ ls
+suda@debian:~/temp/node_animal$ ls
 README.md  app.js  bin  package-lock.json  package.json  public  routes  views
 
-suda@debian:~/temp/node_chat$ npm install
+suda@debian:~/temp/node_animal$ npm install
 
 > uws@0.14.5 install /home/suda/temp/node_chat/node_modules/uws
 > node-gyp rebuild > build_log.txt 2>&1 || exit 0
 
 added 91 packages in 1.452s
 
-suda@debian:~/temp/node_chat$ PORT=4000 npm start
+suda@debian:~/temp/node_animal$ npm start
 
 > test@0.0.0 start /home/suda/temp/node_chat
 > node ./bin/www
 ```
 
+
 途中で```npm install```しているのは，通常パッケージマネージャが存在する言語・環境の場合はパッケージ情報（package.json）だけをアップロードしておいて，サービスを立ち上げる際に公式サーバからダウンロードします．
 よって，ここでもその流儀に従って公式サイトよりダウンロードしています．
-ここで疑問が湧くかもしれませんが，作成したnode_testにはすでにパッケージがダウンロードされていました．
-リポジトリ上ではそれらのパッケージはどこに消えたのでしょうか？
-
+ところで，開発者がダウンロードしたパッケージはどこに消えたのでしょうか？
 実は，```.gitignore```に管理対象外とするファイルやディレクトリを登録することができます．
-今回はGogs上でリポジトリを作成する際に```.gitignore```に```node```を指定してあるのでそれらのファイル（```node_modules```ディレクトリ）が管理対象外となっています．
+今回はリポジトリを作成する際に```.gitignore```に```node```を指定してあるのでそれらのファイル（```node_modules```ディレクトリ）が管理対象外となっています．
 
-実行する際に```PORT=4000```としているのは，すでに3000番ポートを使っているので他のポートを割り当てるためです．
-なお，VirtualBoxのポートフォワードの設定に4000→4000を追加しておいてください．
-この状態でWebブラウザから```http://localhost:4000/chat.html```にアクセスすると，チャットが実行できるはずです．
+この状態でWebブラウザから```http://localhost/chat.html```にアクセスすると，チャットが実行できるはずです．
+なお，VirtualBoxのポートフォワードの設定も必要です．ポート番号を80番以外にした場合，上記URLも変更となります．
 
 ## Dockerfileの作成
 
