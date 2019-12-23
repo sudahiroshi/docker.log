@@ -371,7 +371,7 @@ suda@debian:~$
 
 ここで，以下のように入力すると，様々な設定を修正することができる．
 
-``
+```
 suda@debina:~$ kubectl edit deployment
 ```
 
