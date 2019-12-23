@@ -1,9 +1,10 @@
 kubernetes.log
 ===============
 
-これまで構築してきたdebianを2つ使う．
-2個めとして，再度debianをインストールしても良いし，環境が許せば仮想計算機のイメージを複製しても良い．
-ここでは，2台めのホスト名をnode2として話を進める．
+DebianにKubernetesをインストールするログを書き留める．
+まずは練習のためにシングルホストKubernetesを構築する．
+
+Debianのホスト名はdebianとする．
 
 ## kubeadmなどの関連コマンドのインストール
 
@@ -14,27 +15,21 @@ kubernetes.log
 順番にログを紹介する．まずは```apt-gransport-https```のインストール．
 
 ```
-suda@kube01:~$ sudo apt-get update && sudo apt-get install -y apt-transport-https
-無視:1 http://ftp.jp.debian.org/debian stretch InRelease
-ヒット:2 https://download.docker.com/linux/debian stretch InRelease
-ヒット:3 http://ftp.jp.debian.org/debian stretch-updates InRelease
-ヒット:4 http://ftp.jp.debian.org/debian stretch Release
-ヒット:6 http://security.debian.org/debian-security stretch/updates InRelease
-パッケージリストを読み込んでいます... 完了
+suda@debian:~$ sudo apt-get install -y apt-transport-https
 パッケージリストを読み込んでいます... 完了
 依存関係ツリーを作成しています
 状態情報を読み取っています... 完了
-apt-transport-https はすでに最新バージョン (1.4.8) です。
-アップグレード: 0 個、新規インストール: 0 個、削除: 0 個、保留: 2 個。
-suda@kube01:~$
+apt-transport-https はすでに最新バージョン (1.4.9) です。
+アップグレード: 0 個、新規インストール: 0 個、削除: 0 個、保留: 1 個。
+suda@debian:~$
 ```
 
 続いて，Kubernetes関連のツールを公開しているGoogleの公開鍵の入手と登録．
 
 ```
-suda@kube01:~$ curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+suda@debian:~$ curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
 OK
-suda@kube01:~$
+suda@debian:~$
 ```
 
 パッケージリポジトリにKubernetes関連のソースを追加（最後の2行）
@@ -71,76 +66,96 @@ deb http://apt.kubernetes.io/ kubernetes-xenial main
 パッケージ情報の更新を行います．
 
 ```
-suda@kube01:~$ sudo apt-get update
+suda@debian:~$ sudo apt-get update
 無視:1 http://ftp.jp.debian.org/debian stretch InRelease
 ヒット:2 http://ftp.jp.debian.org/debian stretch-updates InRelease
 ヒット:3 http://ftp.jp.debian.org/debian stretch Release
-ヒット:5 http://security.debian.org/debian-security stretch/updates InRelease
+ヒット:6 http://security.debian.org/debian-security stretch/updates InRelease
 ヒット:7 https://download.docker.com/linux/debian stretch InRelease
-取得:6 https://packages.cloud.google.com/apt kubernetes-xenial InRelease [8,987 B]
-取得:8 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 Packages [13.2 kB]
-22.2 kB を 0秒 で取得しました (22.6 kB/s)
+取得:4 https://packages.cloud.google.com/apt kubernetes-xenial InRelease [8,993 B]
+取得:8 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 Packages [32.2 kB]
+41.2 kB を 2秒 で取得しました (19.9 kB/s)
 パッケージリストを読み込んでいます... 完了
-suda@kube01:~$
+suda@debian:~$
 ```
 
 必要とするパッケージ```kubelet```，```kubeadm```，```kubectl```をインストールします．
 
 ```
-suda@kube01:~$ sudo apt-get install -y kubelet kubeadm kubectl
+suda@debian:~$ sudo apt-get update
+無視:1 http://ftp.jp.debian.org/debian stretch InRelease
+ヒット:2 http://ftp.jp.debian.org/debian stretch-updates InRelease
+ヒット:3 http://ftp.jp.debian.org/debian stretch Release
+ヒット:6 http://security.debian.org/debian-security stretch/updates InRelease
+ヒット:7 https://download.docker.com/linux/debian stretch InRelease
+取得:4 https://packages.cloud.google.com/apt kubernetes-xenial InRelease [8,993 B]
+取得:8 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 Packages [32.2 kB]
+41.2 kB を 2秒 で取得しました (19.9 kB/s)
+パッケージリストを読み込んでいます... 完了
+suda@debian:~$ sudo apt-get install -y kubelet kubeadm kubectl
 パッケージリストを読み込んでいます... 完了
 依存関係ツリーを作成しています
 状態情報を読み取っています... 完了
 以下の追加パッケージがインストールされます:
-  ebtables ethtool kubernetes-cni socat
+  conntrack cri-tools ebtables ethtool kubernetes-cni socat
 以下のパッケージが新たにインストールされます:
-  ebtables ethtool kubeadm kubectl kubelet kubernetes-cni socat
-アップグレード: 0 個、新規インストール: 7 個、削除: 0 個、保留: 2 個。
-57.5 MB のアーカイブを取得する必要があります。
-この操作後に追加で 414 MB のディスク容量が消費されます。
-取得:1 http://ftp.jp.debian.org/debian stretch/main amd64 ebtables amd64 2.0.10.4-3.5+b1 [85.5 kB]
-取得:2 http://ftp.jp.debian.org/debian stretch/main amd64 ethtool amd64 1:4.8-1+b1 [113 kB]
-取得:3 http://ftp.jp.debian.org/debian stretch/main amd64 socat amd64 1.7.3.1-2+deb9u1 [353 kB]
-取得:4 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubernetes-cni amd64 0.6.0-00 [5,910 kB]
-取得:5 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubelet amd64 1.9.3-00 [20.5 MB]
-取得:6 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubectl amd64 1.9.3-00 [10.5 MB]
-取得:7 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubeadm amd64 1.9.3-00 [20.1 MB]
-57.5 MB を 5秒 で取得しました (11.5 MB/s)
+  conntrack cri-tools ebtables ethtool kubeadm kubectl kubelet kubernetes-cni socat
+アップグレード: 0 個、新規インストール: 9 個、削除: 0 個、保留: 1 個。
+51.8 MB のアーカイブを取得する必要があります。
+この操作後に追加で 273 MB のディスク容量が消費されます。
+取得:1 http://ftp.jp.debian.org/debian stretch/main amd64 conntrack amd64 1:1.4.4+snapshot20161117-5 [32.9 kB]
+取得:2 http://ftp.jp.debian.org/debian stretch/main amd64 ebtables amd64 2.0.10.4-3.5+b1 [85.5 kB]
+取得:4 http://ftp.jp.debian.org/debian stretch/main amd64 ethtool amd64 1:4.8-1+b1 [113 kB]
+取得:5 http://ftp.jp.debian.org/debian stretch/main amd64 socat amd64 1.7.3.1-2+deb9u1 [353 kB]
+取得:3 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 cri-tools amd64 1.13.0-00 [8,776 kB]
+取得:6 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubernetes-cni amd64 0.7.5-00 [6,473 kB]
+取得:7 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubelet amd64 1.17.0-00 [19.2 MB]
+取得:8 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubectl amd64 1.17.0-00 [8,742 kB]
+取得:9 https://packages.cloud.google.com/apt kubernetes-xenial/main amd64 kubeadm amd64 1.17.0-00 [8,059 kB]
+51.8 MB を 9秒 で取得しました (5,282 kB/s)
+以前に未選択のパッケージ conntrack を選択しています。
+(データベースを読み込んでいます ... 現在 49610 個のファイルとディレクトリがインストールされています。)
+.../0-conntrack_1%3a1.4.4+snapshot20161117-5_amd64.deb を展開する準備をしています ...
+conntrack (1:1.4.4+snapshot20161117-5) を展開しています...
+以前に未選択のパッケージ cri-tools を選択しています。
+.../1-cri-tools_1.13.0-00_amd64.deb を展開する準備をしています ...
+cri-tools (1.13.0-00) を展開しています...
 以前に未選択のパッケージ ebtables を選択しています。
-(データベースを読み込んでいます ... 現在 49520 個のファイルとディレクトリがインストールされています。)
-.../0-ebtables_2.0.10.4-3.5+b1_amd64.deb を展開する準備をしています ...
+.../2-ebtables_2.0.10.4-3.5+b1_amd64.deb を展開する準備をしています ...
 ebtables (2.0.10.4-3.5+b1) を展開しています...
 以前に未選択のパッケージ ethtool を選択しています。
-.../1-ethtool_1%3a4.8-1+b1_amd64.deb を展開する準備をしています ...
+.../3-ethtool_1%3a4.8-1+b1_amd64.deb を展開する準備をしています ...
 ethtool (1:4.8-1+b1) を展開しています...
 以前に未選択のパッケージ kubernetes-cni を選択しています。
-.../2-kubernetes-cni_0.6.0-00_amd64.deb を展開する準備をしています ...
-kubernetes-cni (0.6.0-00) を展開しています...
+.../4-kubernetes-cni_0.7.5-00_amd64.deb を展開する準備をしています ...
+kubernetes-cni (0.7.5-00) を展開しています...
 以前に未選択のパッケージ socat を選択しています。
-.../3-socat_1.7.3.1-2+deb9u1_amd64.deb を展開する準備をしています ...
+.../5-socat_1.7.3.1-2+deb9u1_amd64.deb を展開する準備をしています ...
 socat (1.7.3.1-2+deb9u1) を展開しています...
 以前に未選択のパッケージ kubelet を選択しています。
-.../4-kubelet_1.9.3-00_amd64.deb を展開する準備をしています ...
-kubelet (1.9.3-00) を展開しています...
+.../6-kubelet_1.17.0-00_amd64.deb を展開する準備をしています ...
+kubelet (1.17.0-00) を展開しています...
 以前に未選択のパッケージ kubectl を選択しています。
-.../5-kubectl_1.9.3-00_amd64.deb を展開する準備をしています ...
-kubectl (1.9.3-00) を展開しています...
+.../7-kubectl_1.17.0-00_amd64.deb を展開する準備をしています ...
+kubectl (1.17.0-00) を展開しています...
 以前に未選択のパッケージ kubeadm を選択しています。
-.../6-kubeadm_1.9.3-00_amd64.deb を展開する準備をしています ...
-kubeadm (1.9.3-00) を展開しています...
-kubernetes-cni (0.6.0-00) を設定しています ...
+.../8-kubeadm_1.17.0-00_amd64.deb を展開する準備をしています ...
+kubeadm (1.17.0-00) を展開しています...
+conntrack (1:1.4.4+snapshot20161117-5) を設定しています ...
+kubernetes-cni (0.7.5-00) を設定しています ...
+cri-tools (1.13.0-00) を設定しています ...
 socat (1.7.3.1-2+deb9u1) を設定しています ...
-systemd (232-25+deb9u1) のトリガを処理しています ...
+systemd (232-25+deb9u12) のトリガを処理しています ...
 ebtables (2.0.10.4-3.5+b1) を設定しています ...
 Created symlink /etc/systemd/system/multi-user.target.wants/ebtables.service → /lib/systemd/system/ebtables.service.
 update-rc.d: warning: start and stop actions are no longer supported; falling back to defaults
-kubectl (1.9.3-00) を設定しています ...
+kubectl (1.17.0-00) を設定しています ...
 ethtool (1:4.8-1+b1) を設定しています ...
-kubelet (1.9.3-00) を設定しています ...
+kubelet (1.17.0-00) を設定しています ...
 Created symlink /etc/systemd/system/multi-user.target.wants/kubelet.service → /lib/systemd/system/kubelet.service.
-kubeadm (1.9.3-00) を設定しています ...
-systemd (232-25+deb9u1) のトリガを処理しています ...
-suda@kube01:~$
+kubeadm (1.17.0-00) を設定しています ...
+systemd (232-25+deb9u12) のトリガを処理しています ...
+suda@debian:~$
 ```
 ## Kubernetesクラスタの作成
 
@@ -149,7 +164,7 @@ suda@kube01:~$
 
 ### 事前準備
 
-1. kubernetesが期待するdockerのバージョンは```17.03```であるが，実際に使用したのは```17.12```である．なんとか動くので良いものとする．
+1. インストール時のDockerのバージョンは19.03.5であった．
 2. Linuxシステムとして，Swapが設定されていると動作しないので，Swapを止める．
 
 #### Swapの止め方（debian, node2の両方で実行）
@@ -178,43 +193,62 @@ Masterノードとは，クラスタ全体の管理を行うノードである�
 
 ```
 suda@debian:~$ sudo kubeadm init --pod-network-cidr=10.244.0.0/16
-[init] Using Kubernetes version: v1.9.3
-[init] Using Authorization modes: [Node RBAC]
-[preflight] Running pre-flight checks.
-	[WARNING SystemVerification]: docker version is greater than the most recently validated version. Docker version: 17.12.0-ce. Max validated version: 17.03
-	[WARNING FileExisting-crictl]: crictl not found in system path
-[preflight] Starting the kubelet service
-[certificates] Generated ca certificate and key.
-[certificates] Generated apiserver certificate and key.
-[certificates] apiserver serving cert is signed for DNS names [debian kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [10.96.0.1 172.16.121.160]
-[certificates] Generated apiserver-kubelet-client certificate and key.
-[certificates] Generated sa key and public key.
-[certificates] Generated front-proxy-ca certificate and key.
-[certificates] Generated front-proxy-client certificate and key.
-[certificates] Valid certificates and keys now exist in "/etc/kubernetes/pki"
-[kubeconfig] Wrote KubeConfig file to disk: "admin.conf"
-[kubeconfig] Wrote KubeConfig file to disk: "kubelet.conf"
-[kubeconfig] Wrote KubeConfig file to disk: "controller-manager.conf"
-[kubeconfig] Wrote KubeConfig file to disk: "scheduler.conf"
-[controlplane] Wrote Static Pod manifest for component kube-apiserver to "/etc/kubernetes/manifests/kube-apiserver.yaml"
-[controlplane] Wrote Static Pod manifest for component kube-controller-manager to "/etc/kubernetes/manifests/kube-controller-manager.yaml"
-[controlplane] Wrote Static Pod manifest for component kube-scheduler to "/etc/kubernetes/manifests/kube-scheduler.yaml"
-[etcd] Wrote Static Pod manifest for a local etcd instance to "/etc/kubernetes/manifests/etcd.yaml"
-[init] Waiting for the kubelet to boot up the control plane as Static Pods from directory "/etc/kubernetes/manifests".
-[init] This might take a minute or longer if the control plane images have to be pulled.
-[apiclient] All control plane components are healthy after 27.501359 seconds
-[uploadconfig] Storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
-[markmaster] Will mark node debian as master by adding a label and a taint
-[markmaster] Master debian tainted and labelled with key/value: node-role.kubernetes.io/master=""
-[bootstraptoken] Using token: ac622a.4225187698b87e71
-[bootstraptoken] Configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
-[bootstraptoken] Configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
-[bootstraptoken] Configured RBAC rules to allow certificate rotation for all node client certificates in the cluster
-[bootstraptoken] Creating the "cluster-info" ConfigMap in the "kube-public" namespace
-[addons] Applied essential addon: kube-dns
+W1223 14:27:06.029997    9818 validation.go:28] Cannot validate kube-proxy config - no validator is available
+W1223 14:27:06.030029    9818 validation.go:28] Cannot validate kubelet config - no validator is available
+[init] Using Kubernetes version: v1.17.0
+[preflight] Running pre-flight checks
+	[WARNING IsDockerSystemdCheck]: detected "cgroupfs" as the Docker cgroup driver. The recommended driver is "systemd". Please follow the guide at https://kubernetes.io/docs/setup/cri/
+[preflight] Pulling images required for setting up a Kubernetes cluster
+[preflight] This might take a minute or two, depending on the speed of your internet connection
+[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'
+[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet-start] Starting the kubelet
+[certs] Using certificateDir folder "/etc/kubernetes/pki"
+[certs] Generating "ca" certificate and key
+[certs] Generating "apiserver" certificate and key
+[certs] apiserver serving cert is signed for DNS names [debian kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [10.96.0.1 10.0.2.15]
+[certs] Generating "apiserver-kubelet-client" certificate and key
+[certs] Generating "front-proxy-ca" certificate and key
+[certs] Generating "front-proxy-client" certificate and key
+[certs] Generating "etcd/ca" certificate and key
+[certs] Generating "etcd/server" certificate and key
+[certs] etcd/server serving cert is signed for DNS names [debian localhost] and IPs [10.0.2.15 127.0.0.1 ::1]
+[certs] Generating "etcd/peer" certificate and key
+[certs] etcd/peer serving cert is signed for DNS names [debian localhost] and IPs [10.0.2.15 127.0.0.1 ::1]
+[certs] Generating "etcd/healthcheck-client" certificate and key
+[certs] Generating "apiserver-etcd-client" certificate and key
+[certs] Generating "sa" key and public key
+[kubeconfig] Using kubeconfig folder "/etc/kubernetes"
+[kubeconfig] Writing "admin.conf" kubeconfig file
+[kubeconfig] Writing "kubelet.conf" kubeconfig file
+[kubeconfig] Writing "controller-manager.conf" kubeconfig file
+[kubeconfig] Writing "scheduler.conf" kubeconfig file
+[control-plane] Using manifest folder "/etc/kubernetes/manifests"
+[control-plane] Creating static Pod manifest for "kube-apiserver"
+[control-plane] Creating static Pod manifest for "kube-controller-manager"
+W1223 14:27:54.651011    9818 manifests.go:214] the default kube-apiserver authorization-mode is "Node,RBAC"; using "Node,RBAC"
+[control-plane] Creating static Pod manifest for "kube-scheduler"
+W1223 14:27:54.651683    9818 manifests.go:214] the default kube-apiserver authorization-mode is "Node,RBAC"; using "Node,RBAC"
+[etcd] Creating static Pod manifest for local etcd in "/etc/kubernetes/manifests"
+[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory "/etc/kubernetes/manifests". This can take up to 4m0s
+[apiclient] All control plane components are healthy after 34.502055 seconds
+[upload-config] Storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
+[kubelet] Creating a ConfigMap "kubelet-config-1.17" in namespace kube-system with the configuration for the kubelets in the cluster
+[upload-certs] Skipping phase. Please see --upload-certs
+[mark-control-plane] Marking the node debian as control-plane by adding the label "node-role.kubernetes.io/master=''"
+[mark-control-plane] Marking the node debian as control-plane by adding the taints [node-role.kubernetes.io/master:NoSchedule]
+[bootstrap-token] Using token: er8h92.1hbd2126um0y6qci
+[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles
+[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
+[bootstrap-token] configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
+[bootstrap-token] configured RBAC rules to allow certificate rotation for all node client certificates in the cluster
+[bootstrap-token] Creating the "cluster-info" ConfigMap in the "kube-public" namespace
+[kubelet-finalize] Updating "/etc/kubernetes/kubelet.conf" to point to a rotatable kubelet client certificate and key
+[addons] Applied essential addon: CoreDNS
 [addons] Applied essential addon: kube-proxy
 
-Your Kubernetes master has initialized successfully!
+Your Kubernetes control-plane has initialized successfully!
 
 To start using your cluster, you need to run the following as a regular user:
 
@@ -226,11 +260,10 @@ You should now deploy a pod network to the cluster.
 Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
   https://kubernetes.io/docs/concepts/cluster-administration/addons/
 
-You can now join any number of machines by running the following on each node
-as root:
+Then you can join any number of worker nodes by running the following on each as root:
 
-  kubeadm join --token ac622a.4225187698b87e71 172.16.121.160:6443 --discovery-token-ca-cert-hash sha256:572be0ef181ba23d987edf03501b00037ee97aa4c23c3a2603a8914f86023e04
-
+kubeadm join 10.0.2.15:6443 --token er8h92.1hbd2126um0y6qci \
+    --discovery-token-ca-cert-hash sha256:19dca7ea4c16425bf8a11fec53b1ed9132c7cd7dce08064a489b97c99d2afe81
 suda@debian:~$
 ```
 
@@ -252,11 +285,16 @@ Pod間の通信手段をセットアップする．
 
 ```
 suda@debian:~$ kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
-clusterrole "flannel" created
-clusterrolebinding "flannel" created
-serviceaccount "flannel" created
-configmap "kube-flannel-cfg" created
-daemonset "kube-flannel-ds" created
+podsecuritypolicy.policy/psp.flannel.unprivileged created
+clusterrole.rbac.authorization.k8s.io/flannel created
+clusterrolebinding.rbac.authorization.k8s.io/flannel created
+serviceaccount/flannel created
+configmap/kube-flannel-cfg created
+daemonset.apps/kube-flannel-ds-amd64 created
+daemonset.apps/kube-flannel-ds-arm64 created
+daemonset.apps/kube-flannel-ds-arm created
+daemonset.apps/kube-flannel-ds-ppc64le created
+daemonset.apps/kube-flannel-ds-s390x created
 suda@debian:~$
 ```
 
@@ -266,6 +304,8 @@ suda@debian:~$
 
 ```
 suda@debian:~$ kubectl taint nodes --all node-role.kubernetes.io/master-
+node/debian untainted
+suda@debian:~$
 ```
 
 ### 確認
@@ -274,14 +314,15 @@ Kubernetesクラスタ上で起動しているすべてのサービスを表示�
 
 ```
 suda@debian:~$ kubectl get pods --all-namespaces
-NAMESPACE     NAME                             READY     STATUS    RESTARTS   AGE
-kube-system   etcd-debian                      1/1       Running   0          12s
-kube-system   kube-apiserver-debian            1/1       Running   0          23s
-kube-system   kube-controller-manager-debian   1/1       Running   0          39s
-kube-system   kube-dns-6f4fd4bdf-wdqjj         0/3       Pending   0          1m
-kube-system   kube-flannel-ds-z2cm5            1/1       Running   0          16s
-kube-system   kube-proxy-dgdgn                 1/1       Running   0          1m
-kube-system   kube-scheduler-debian            1/1       Running   0          40s
+NAMESPACE     NAME                             READY   STATUS    RESTARTS   AGE
+kube-system   coredns-6955765f44-cb4v9         1/1     Running   0          93s
+kube-system   coredns-6955765f44-xvj46         1/1     Running   0          93s
+kube-system   etcd-debian                      1/1     Running   0          89s
+kube-system   kube-apiserver-debian            1/1     Running   0          89s
+kube-system   kube-controller-manager-debian   1/1     Running   0          89s
+kube-system   kube-flannel-ds-amd64-d562n      1/1     Running   0          40s
+kube-system   kube-proxy-xt7qm                 1/1     Running   0          93s
+kube-system   kube-scheduler-debian            1/1     Running   0          89s
 suda@debian:~$
 ```
 
@@ -289,88 +330,10 @@ suda@debian:~$
 
 ```
 suda@debian:~$ kubectl get nodes
-NAME      STATUS     ROLES     AGE       VERSION
-debian    Ready      master    3m        v1.9.3
-```
-
-## ノードの追加（node2で実行）
-
-続いて，Workerノードを追加する．
-workerノードとは，実際にサービスが実行されるホストである．
-なお，ここで入力する内容は，Masterノードで```kubeadm init```を実行した際に表示される内容である．
-
-注：ここで、docker-ce 19.03だとエラーが出る。18.09を使わないといけないようだ。
-また、VirtualBoxで解放したポートは以下の通り。
-
-プロトコル | ポート
--|-
-TCP | 80
-TCP | 22
-TCP | 6443
-TCP | 8472
-TCP | 31707
-TCP | 443
-TCP | 10251
-TCP | 10252
-TCP | 10256
-TCP | 4194
-TCP | 2379
-TCP | 8472
-
-```
-suda@node2:~$ sudo kubeadm join --token ac622a.4225187698b87e71 172.16.121.160:6443 --discovery-token-ca-cert-hash sha256:572be0ef181ba23d987edf03501b00037ee97aa4c23c3a2603a8914f86023e04
-[preflight] Running pre-flight checks.
-	[WARNING SystemVerification]: docker version is greater than the most recently validated version. Docker version: 17.12.0-ce. Max validated version: 17.03
-	[WARNING FileExisting-crictl]: crictl not found in system path
-[preflight] Starting the kubelet service
-[discovery] Trying to connect to API Server "172.16.121.160:6443"
-[discovery] Created cluster-info discovery client, requesting info from "https://172.16.121.160:6443"
-[discovery] Requesting info from "https://172.16.121.160:6443" again to validate TLS against the pinned public key
-[discovery] Cluster info signature and contents are valid and TLS certificate validates against pinned roots, will use API Server "172.16.121.160:6443"
-[discovery] Successfully established connection with API Server "172.16.121.160:6443"
-
-This node has joined the cluster:
-* Certificate signing request was sent to master and a response
-  was received.
-* The Kubelet was informed of the new secure connection details.
-
-Run 'kubectl get nodes' on the master to see this node join the cluster.
-suda@node2:~$
-```
-
-## 追加されたノードの確認（debianで実行）
-
-ノードの確認コマンドを実行すると，node2が追加されているはずである．
-なお，STATUSが```NotReady```になっているのは，起動処理のためである．
-
-```
-suda@debian:~$ kubectl get nodes
-NAME      STATUS     ROLES     AGE       VERSION
-debian    Ready      master    9m        v1.9.3
-node2     NotReady   <none>    3s        v1.9.3
+NAME     STATUS   ROLES    AGE     VERSION
+debian   Ready    master   2m10s   v1.17.0
 suda@debian:~$
 ```
-
-しばらく待ってから．再度確認コマンドを実行すると，以下のように```Ready```になる．
-
-```
-suda@debian:~$ kubectl get nodes
-NAME      STATUS    ROLES     AGE       VERSION
-debian    Ready     master    47m       v1.9.3
-node2     Ready     <none>    38m       v1.9.3
-suda@debian:~$
-```
-
-もう少し詳しい情報を知りたい場合は，```-o wide```オプションを利用すると良い．
-
-```
-suda@debian:~$ kubectl get nodes -o wide
-NAME      STATUS    ROLES     AGE       VERSION   EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION   CONTAINER-RUNTIME
-debian    Ready     master    30m       v1.9.3    <none>        Debian GNU/Linux 9 (stretch)   4.9.0-4-amd64    docker://17.12.0-ce
-node2     Ready     <none>    28m       v1.9.3    <none>        Debian GNU/Linux 9 (stretch)   4.9.0-4-amd64    docker://17.12.0-ce
-suda@debian:~$
-```
-
 
 ## サービスのデプロイ（debianで実行）
 
@@ -387,18 +350,19 @@ suda@debian:~$
 
 ```
 suda@debian:~$ kubectl run nginx --image=nginx
-deployment "nginx" created
+kubectl run --generator=deployment/apps.v1 is DEPRECATED and will be removed in a future version. Use kubectl run --generator=run-pod/v1 or kubectl create instead.
+deployment.apps/nginx created
 suda@debian:~$
 ```
 
+将来的にrunの中でdeploymentを使うのは使えなくなるのでやめろと言われているが，現状は動いているので良しとする．
 これまで起動を確認する．
 Kubernetesでは，PODという単位で動いているコンテナを確認できる．
 
 ```
 suda@debian:~$ kubectl get pods
-NAME                   READY     STATUS    RESTARTS   AGE
-nginx-8586cf59-99wc7   1/1       Running   0          9s
-
+NAME                     READY   STATUS    RESTARTS   AGE
+nginx-6db489d4b7-g8z5s   1/1     Running   0          22s
 suda@debian:~$
 ```
 
@@ -408,7 +372,7 @@ LoadBalancerを起動する．
 
 ```
 suda@debian:~$ kubectl expose deployment nginx --port 80 --type LoadBalancer
-service "nginx" exposed
+service/nginx exposed
 suda@debian:~$
 ```
 
@@ -418,10 +382,9 @@ suda@debian:~$
 
 ```
 suda@debian:~$ kubectl get services
-NAME         TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
-kubernetes   ClusterIP      10.96.0.1      <none>        443/TCP        1h
-nginx        LoadBalancer   10.108.215.1   <pending>     80:31136/TCP   10s
-
+NAME         TYPE           CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
+kubernetes   ClusterIP      10.96.0.1     <none>        443/TCP        5m43s
+nginx        LoadBalancer   10.96.27.72   <pending>     80:30929/TCP   14s
 suda@debian:~$
 ```
 
@@ -436,11 +399,11 @@ Labels:                   run=nginx
 Annotations:              <none>
 Selector:                 run=nginx
 Type:                     LoadBalancer
-IP:                       10.108.215.1
+IP:                       10.96.27.72
 Port:                     <unset>  80/TCP
 TargetPort:               80/TCP
-NodePort:                 <unset>  31136/TCP
-Endpoints:                10.244.2.2:80
+NodePort:                 <unset>  30929/TCP
+Endpoints:                10.244.0.4:80
 Session Affinity:         None
 External Traffic Policy:  Cluster
 Events:                   <none>
@@ -460,34 +423,32 @@ Ingressは仕組みの名称であり，実体にはLoadBalancerやNginxによ�
 まずはdefault-backendを起動する．
 
 ```
-suda@kube01:~$ kubectl create -f https://raw.githubusercontent.com/jcmoraisjr/haproxy-ingress/master/docs/haproxy-ingress.yaml
-namespace "ingress-controller" created
-serviceaccount "ingress-controller" created
-clusterrole "ingress-controller" created
-role "ingress-controller" created
-clusterrolebinding "ingress-controller" created
-rolebinding "ingress-controller" created
-deployment "ingress-default-backend" created
-service "ingress-default-backend" created
-configmap "haproxy-ingress" created
-daemonset "haproxy-ingress" created
-suda@kube01:~$
+suda@debian:~$ kubectl create -f https://raw.githubusercontent.com/jcmoraisjr/haproxy-ingress/master/docs/haproxy-ingress.yaml
+namespace/ingress-controller created
+serviceaccount/ingress-controller created
+clusterrole.rbac.authorization.k8s.io/ingress-controller created
+role.rbac.authorization.k8s.io/ingress-controller created
+clusterrolebinding.rbac.authorization.k8s.io/ingress-controller created
+rolebinding.rbac.authorization.k8s.io/ingress-controller created
+deployment.apps/ingress-default-backend created
+service/ingress-default-backend created
+configmap/haproxy-ingress created
+daemonset.apps/haproxy-ingress created
+suda@debian:~$
 ```
 
 その後，node名を調べてroleを指定する．
 
 ```
-suda@kube01:~$ kubectl get node
-NAME      STATUS    ROLES     AGE       VERSION
-kube01    Ready     master    19m       v1.9.3
-
-suda@kube01:~$ kubectl label node kube01 role=ingress-controller
-node "kube01" labeled
-
-suda@kube01:~$ kubectl -n ingress-controller get ds
-NAME              DESIRED   CURRENT   READY     UP-TO-DATE   AVAILABLE   NODE SELECTOR             AGE
-haproxy-ingress   1         1         0         1            0           role=ingress-controller   19m
-suda@kube01:~$
+suda@debian:~$ kubectl get node
+NAME     STATUS   ROLES    AGE     VERSION
+debian   Ready    master   7m18s   v1.17.0
+suda@debian:~$ kubectl label node debian role=ingress-controller
+node/debian labeled
+suda@debian:~$ kubectl -n ingress-controller get ds
+NAME              DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR             AGE
+haproxy-ingress   1         1         1       1            1           role=ingress-controller   57s
+suda@debian:~$
 ```
 
 参考までに，ここで与えるのはnode名でなければならず，IPアドレスを指定してもエラーとなった．
@@ -520,11 +481,10 @@ spec:
 
 ```
 suda@debian:~$ kubectl create -f ingress.yaml
-ingress "test-ingress" created
-
+ingress.extensions/test-ingress created
 suda@debian:~$ kubectl get ingress
-NAME           HOSTS     ADDRESS   PORTS     AGE
-test-ingress   *                   80        5s
+NAME           HOSTS   ADDRESS   PORTS   AGE
+test-ingress   *                 80      6s
 suda@debian:~$
 ```
 
@@ -534,11 +494,16 @@ suda@debian:~$
 
 ```
 suda@debian:~$ kubectl get services
-NAME         TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
-kubernetes   ClusterIP      10.96.0.1        <none>        443/TCP        20h
-nginx        LoadBalancer   10.108.132.235   <pending>     80:31375/TCP   37m
+NAME         TYPE           CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
+kubernetes   ClusterIP      10.96.0.1     <none>        443/TCP        9m51s
+nginx        LoadBalancer   10.96.27.72   <pending>     80:30929/TCP   4m22s
 suda@debian:~$
 ```
+
+ここまで設定すると，localhostの80番ポートへのアクセスを，nginxに繋げてくれるはずなのだが，上手くいかない．
+なぜ？
+
+参考までに，10.96.27.72の80番ポートにアクセスすると，Welcome to nginx!が返される．
 
 ### ホスト名ベースのロードバランサを設定する
 
