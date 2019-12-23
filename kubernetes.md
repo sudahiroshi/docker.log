@@ -345,9 +345,9 @@ debian   Ready    master   2m10s   v1.17.0
 suda@debian:~$
 ```
 
+## nginxの起動
 
-
-まずはnginxを動かしてみる．
+まずはnginxを動かしてみよう．
 
 ```
 suda@debian:~$ kubectl run nginx --image=nginx
@@ -540,7 +540,18 @@ nginx-6db489d4b7-rd9qq   0/1     CrashLoopBackOff   1          9m15s
 nginx-6db489d4b7-rd9qq   1/1     Running   2          9m16s
 ```
 
+このように，不意にコンテナが落ちても，サービス全体が落ちることのないよう，Kubernetesが監視してくれる．
 
+## サービスのデプロイ（debianで実行）
+
+無事にクラスタができたので，nginxにアクセスするための手順を示す．
+1. LoadBalancerを通じて外部に公開
+2. 外部からアクセスするためのIPアドレスの確認
+3. サービスの基本的な情報を表示
+
+なぜか，外部IPがpengingのまま・・・
+ついでなので，nginxのサービスの詳細を表示してみる．
+ここでNodePortという項目が外部ポートである．
 
 LoadBalancerを起動する．
 これによって，外部からのアクセスが可能になる．
@@ -564,22 +575,7 @@ nginx        LoadBalancer   10.96.27.72   <pending>     80:30929/TCP   14s
 suda@debian:~$
 ```
 
-## サービスのデプロイ（debianで実行）
-
-無事にクラスタができたので，nginxにアクセスするための手順を示す．
-1. LoadBalancerを通じて外部に公開
-2. 外部からアクセスするためのIPアドレスの確認
-3. サービスの基本的な情報を表示
-
-なぜか，外部IPがpengingのまま・・・
-ついでなので，nginxのサービスの詳細を表示してみる．
-ここでNodePortという項目が外部ポートである．
-
-まずは
-nginxに
-関する情報を確認する
-関する情報を確認する．
-
+nginxの情報をもう少し詳細に表示するには，以下のように```describe```を使用する．
 
 ```
 suda@debian:~$ kubectl describe services nginx
