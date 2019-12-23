@@ -5,6 +5,7 @@ DebianにKubernetesをインストールするログを書き留める．
 まずは練習のためにシングルホストKubernetesを構築する．
 
 Debianのホスト名はdebianとする．
+また，Kubernetesが最低でもCPUコアを2つ要求するので，VirtualBoxやVMWareの設定でプロセッサを2つ以上に設定すること．
 
 ## kubeadmなどの関連コマンドのインストール
 
@@ -185,6 +186,15 @@ suda@debian:~$
 Masterノードとは，クラスタ全体の管理を行うノードである．
 順番に説明していく．
 
+### 再実行する場合
+
+Kubernetesの設定をしていてやり直したい場合や，設定後に電源を落として再起動した場合は以下の操作が必要となる．
+
+```
+suda@debian:~$ sudo kubeadm reset
+suda@debian:~$
+```
+
 ### Masterノードの起動（debianで実行）
 
 ここではdebianで実行する箇所である．
@@ -335,16 +345,7 @@ debian   Ready    master   2m10s   v1.17.0
 suda@debian:~$
 ```
 
-## サービスのデプロイ（debianで実行）
 
-無事にクラスタができたので，簡単なサービスを起動してみる．
-手順としては，
-1. nginxの起動
-2. LoadBalancerを通じて外部に公開
-3. 外部からアクセスするためのIPアドレスの確認
-4. サービスの基本的な情報を表示
-
-なぜか，外部IPがpengingのまま・・・
 
 まずはnginxを動かしてみる．
 
@@ -362,9 +363,184 @@ Kubernetesでは，PODという単位で動いているコンテナを確認で�
 ```
 suda@debian:~$ kubectl get pods
 NAME                     READY   STATUS    RESTARTS   AGE
-nginx-6db489d4b7-g8z5s   1/1     Running   0          22s
+nginx-6db489d4b7-qdz6p   1/1     Running   0          22s
 suda@debian:~$
 ```
+
+### コンテナ数を変更する
+
+ここで，以下のように入力すると，様々な設定を修正することができる．
+
+``
+suda@debina:~$ kubectl edit deployment
+```
+
+エディタが起動するので内容を確認して欲しい．
+
+```
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2019-12-23T06:14:14Z"
+  generation: 3
+  labels:
+    run: nginx
+  name: nginx
+  namespace: default
+  resourceVersion: "6428"
+  selfLink: /apis/apps/v1/namespaces/default/deployments/nginx
+  uid: d900855c-7112-4fe2-8b2f-560bc04dc972
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      run: nginx
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: nginx
+    spec:
+      containers:
+      - image: nginx
+        imagePullPolicy: Always
+        name: nginx
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2019-12-23T06:14:14Z"
+    lastUpdateTime: "2019-12-23T06:14:18Z"
+    message: ReplicaSet "nginx-6db489d4b7" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  - lastTransitionTime: "2019-12-23T06:44:20Z"
+    lastUpdateTime: "2019-12-23T06:44:20Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+```
+
+ここで，起動しているnginxのコンテナ数を変更してみよう．
+21行目の```replicas```が，コンテナ数である．
+例えばこれを3にしてみよう．
+行頭の数字は行番号なので，無視すること．
+
+```
+21   replicas: 3
+```
+
+保存して終了すると，コンテナ数が増える．
+タイミングによって表示内容が異なるが，エディタ終了直後にpodを確認すると以下のように表示される．
+
+```
+suda@debian:~$ kubectl get pods
+NAME                     READY   STATUS              RESTARTS   AGE
+nginx-6db489d4b7-qdz6p   1/1     Running             0          37m
+nginx-6db489d4b7-rd9qq   0/1     ContainerCreating   0          2s
+nginx-6db489d4b7-xnkks   0/1     ContainerCreating   0          2s
+```
+
+1つ目が先程から実行されているコンテナで，下2つが新たに起動しようとしているコンテナである．
+しばらく待ってから確認すると，以下のように起動していることが分かる．
+
+```
+suda@debian:~$ kubectl get pods
+NAME                     READY   STATUS    RESTARTS   AGE
+nginx-6db489d4b7-qdz6p   1/1     Running   0          37m
+nginx-6db489d4b7-rd9qq   1/1     Running   0          9s
+nginx-6db489d4b7-xnkks   1/1     Running   0          9s
+suda@debian:~$
+```
+
+続いて，手動でコンテナを終了させてみよう．
+まずはnginxに関連するコンテナ情報をdockerコマンドで表示してみよう．
+
+```
+suda@debian:~$ sudo docker ps | grep nginx
+4f5c772bda64        nginx                  "nginx -g 'daemon of…"   3 minutes ago       Up 2 minutes                            k8s_nginx_nginx-6db489d4b7-rd9qq_default_aad8c84a-5204-41ea-9ab9-28b9e24fdb19_0
+1d3c6f512657        nginx                  "nginx -g 'daemon of…"   3 minutes ago       Up 3 minutes                            k8s_nginx_nginx-6db489d4b7-xnkks_default_6451b3a2-07d2-4234-9638-054db19484d0_0
+9f6f9d361618        k8s.gcr.io/pause:3.1   "/pause"                 3 minutes ago       Up 3 minutes                            k8s_POD_nginx-6db489d4b7-xnkks_default_6451b3a2-07d2-4234-9638-054db19484d0_0
+e429e92936a4        k8s.gcr.io/pause:3.1   "/pause"                 3 minutes ago       Up 3 minutes                            k8s_POD_nginx-6db489d4b7-rd9qq_default_aad8c84a-5204-41ea-9ab9-28b9e24fdb19_0
+137601861f14        nginx                  "nginx -g 'daemon of…"   40 minutes ago      Up 40 minutes                           k8s_nginx_nginx-6db489d4b7-qdz6p_default_ce7c5b3c-cb04-4e6c-bc06-609d81b665f7_0
+9d40c73d5531        k8s.gcr.io/pause:3.1   "/pause"                 40 minutes ago      Up 40 minutes                           k8s_POD_nginx-6db489d4b7-qdz6p_default_ce7c5b3c-cb04-4e6c-bc06-609d81b665f7_0
+031a3383c5ae        3297e40e273c           "nginx -g 'daemon of…"   45 minutes ago      Up 45 minutes                           k8s_http-svc_http-svc-5b874554-5xqk8_ingress-controller_210f8457-bbb3-4720-8e1e-15fe322f9463_0
+suda@debian:~$
+```
+
+少々見づらいが，左から2番めの欄に```nginx```と書いてあるものが該当するコンテナである．
+1行目の```4f5c```で始まるコンテナを終了させてすぐにコンテナ情報を確認してみよう．
+
+```
+suda@debian:~$ sudo docker kill 4f5c
+4f5c
+suda@debian:~$ sudo docker ps | grep nginx
+1d3c6f512657        nginx                  "nginx -g 'daemon of…"   5 minutes ago       Up 5 minutes                            k8s_nginx_nginx-6db489d4b7-xnkks_default_6451b3a2-07d2-4234-9638-054db19484d0_0
+9f6f9d361618        k8s.gcr.io/pause:3.1   "/pause"                 5 minutes ago       Up 5 minutes                            k8s_POD_nginx-6db489d4b7-xnkks_default_6451b3a2-07d2-4234-9638-054db19484d0_0
+e429e92936a4        k8s.gcr.io/pause:3.1   "/pause"                 5 minutes ago       Up 5 minutes                            k8s_POD_nginx-6db489d4b7-rd9qq_default_aad8c84a-5204-41ea-9ab9-28b9e24fdb19_0
+137601861f14        nginx                  "nginx -g 'daemon of…"   43 minutes ago      Up 43 minutes                           k8s_nginx_nginx-6db489d4b7-qdz6p_default_ce7c5b3c-cb04-4e6c-bc06-609d81b665f7_0
+9d40c73d5531        k8s.gcr.io/pause:3.1   "/pause"                 43 minutes ago      Up 43 minutes                           k8s_POD_nginx-6db489d4b7-qdz6p_default_ce7c5b3c-cb04-4e6c-bc06-609d81b665f7_0
+031a3383c5ae        3297e40e273c           "nginx -g 'daemon of…"   47 minutes ago      Up 47 minutes                           k8s_http-svc_http-svc-5b874554-5xqk8_ingress-controller_210f8457-bbb3-4720-8e1e-15fe322f9463_0
+suda@debian:~$
+```
+
+この時点では確かにnginxコンテナは2つに減っている．
+少し時間をおいて再び確認すると，また3つになっている．
+
+```
+suda@debian:~$ sudo docker ps | grep nginx
+a22e796e097b        nginx                  "nginx -g 'daemon of…"   14 seconds ago      Up 13 seconds                           k8s_nginx_nginx-6db489d4b7-rd9qq_default_aad8c84a-5204-41ea-9ab9-28b9e24fdb19_1
+1d3c6f512657        nginx                  "nginx -g 'daemon of…"   5 minutes ago       Up 5 minutes                            k8s_nginx_nginx-6db489d4b7-xnkks_default_6451b3a2-07d2-4234-9638-054db19484d0_0
+9f6f9d361618        k8s.gcr.io/pause:3.1   "/pause"                 5 minutes ago       Up 5 minutes                            k8s_POD_nginx-6db489d4b7-xnkks_default_6451b3a2-07d2-4234-9638-054db19484d0_0
+e429e92936a4        k8s.gcr.io/pause:3.1   "/pause"                 5 minutes ago       Up 5 minutes                            k8s_POD_nginx-6db489d4b7-rd9qq_default_aad8c84a-5204-41ea-9ab9-28b9e24fdb19_0
+137601861f14        nginx                  "nginx -g 'daemon of…"   43 minutes ago      Up 43 minutes                           k8s_nginx_nginx-6db489d4b7-qdz6p_default_ce7c5b3c-cb04-4e6c-bc06-609d81b665f7_0
+9d40c73d5531        k8s.gcr.io/pause:3.1   "/pause"                 43 minutes ago      Up 43 minutes                           k8s_POD_nginx-6db489d4b7-qdz6p_default_ce7c5b3c-cb04-4e6c-bc06-609d81b665f7_0
+031a3383c5ae        3297e40e273c           "nginx -g 'daemon of…"   47 minutes ago      Up 47 minutes                           k8s_http-svc_http-svc-5b874554-5xqk8_ingress-controller_210f8457-bbb3-4720-8e1e-15fe322f9463_0
+suda@debian:~$
+```
+
+Kubectlコマンドでnginxコンテナを追ってみたものを以下に示す．
+以下のように，KILLされたコンテナは，Kubernetes上でのステータスは```Error```となり，数秒待つと```CrashLoopbackOff```になる．
+その後，再起動されるという手順を経る．
+
+```
+suda@debian:~$ kubectl get pods を繰り返し実行して該当箇所を抜粋したもので，実際の表示結果とは異なる
+NAME                     READY   STATUS    RESTARTS   AGE
+nginx-6db489d4b7-rd9qq   0/1     Error     1          9m4s
+nginx-6db489d4b7-rd9qq   0/1     Error     1          9m7s
+nginx-6db489d4b7-rd9qq   0/1     Error     1          9m12s
+nginx-6db489d4b7-rd9qq   0/1     CrashLoopBackOff   1          9m13s
+nginx-6db489d4b7-rd9qq   0/1     CrashLoopBackOff   1          9m15s
+nginx-6db489d4b7-rd9qq   1/1     Running   2          9m16s
+```
+
+
 
 LoadBalancerを起動する．
 これによって，外部からのアクセスが可能になる．
@@ -388,8 +564,22 @@ nginx        LoadBalancer   10.96.27.72   <pending>     80:30929/TCP   14s
 suda@debian:~$
 ```
 
+## サービスのデプロイ（debianで実行）
+
+無事にクラスタができたので，nginxにアクセスするための手順を示す．
+1. LoadBalancerを通じて外部に公開
+2. 外部からアクセスするためのIPアドレスの確認
+3. サービスの基本的な情報を表示
+
+なぜか，外部IPがpengingのまま・・・
 ついでなので，nginxのサービスの詳細を表示してみる．
 ここでNodePortという項目が外部ポートである．
+
+まずは
+nginxに
+関する情報を確認する
+関する情報を確認する．
+
 
 ```
 suda@debian:~$ kubectl describe services nginx
